@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm.cmd run *)",
+      "Bash(cd \"C:\\\\Users\\\\User\\\\.claude\\\\projects\\\\C--Users-User-Desktop-PetHelp-main\\\\memory\" 2>/dev/null && ls 2>/dev/null || echo \"no memory dir listing\")",
+      "Read(//c/Program Files/PostgreSQL/18/bin/**)",
+      "Read(//c/Program Files/PostgreSQL/18/bin//**)",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git -c core.autocrlf=false commit -q -m ' *)",
+      "Bash(grep -n \"Olá\\\\|Ola,\\\\|user?.name\\\\|user.name\\\\|greeting\\\\|{user\" src/app/components/layout/TutorShell.tsx)"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+# Blueprint do Render para publicar o PetHelp (banco + API + site) de uma vez.
+# Como usar: no painel do Render -> New -> Blueprint -> conecte o repositório do GitHub.
+# Depois de criado, preencha os 2 valores marcados como "sync: false":
+#   1) Em pethelp-api  -> CORS_ORIGINS = a URL do site (ex.: https://pethelp-web.onrender.com)
+#   2) Em pethelp-web  -> VITE_API_URL = a URL da API  (ex.: https://pethelp-api.onrender.com)
+# e clique em "Manual Deploy" no site depois de definir a VITE_API_URL.
+
+databases:
+  - name: pethelp-db
+    databaseName: pethelp
+    plan: free
+
+services:
+  # ---- API (backend Express + TypeScript) ----
+  - type: web
+    name: pethelp-api
+    runtime: node
+    plan: free
+    rootDir: services/backend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pethelp-db
+          property: connectionString
+      - key: POSTGRES_SSL
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
+
+  # ---- Site (frontend React + Vite, servido como estático) ----
+  # Sites estáticos no Render são sempre gratuitos e NÃO aceitam o campo "plan".
+  - type: web
+    name: pethelp-web
+    runtime: static
+    rootDir: apps/web
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # Faz o roteamento do React (SPA) funcionar ao recarregar qualquer página.
+      - type: rewrite
+        source: /*
+        destination: /index.html
