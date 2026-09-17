@@ -493,7 +493,7 @@ export default function VeterinarianDashboardScreen() {
               <div className="space-y-1">
                 <h1 className="text-3xl text-foreground sm:text-[40px]">Dashboard do veterinário</h1>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  Valide o código do tutor para acessar histórico, exames e registrar o atendimento.
+                  Valide o código do responsável para acessar histórico, exames e registrar o atendimento.
                 </p>
               </div>
             </div>
@@ -535,7 +535,7 @@ export default function VeterinarianDashboardScreen() {
           <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Vet-Pass do tutor</p>
+                <p className="text-sm text-muted-foreground">Vet-Pass do responsável</p>
                 <h2 className="text-2xl text-foreground">Validar código</h2>
               </div>
               <ShieldCheck className="h-6 w-6 text-primary" />
@@ -686,7 +686,7 @@ export default function VeterinarianDashboardScreen() {
               </div>
             ) : (
               <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Nenhum Vet-Pass validado ainda. Use o código do tutor para liberar o atendimento.
+                Nenhum Vet-Pass validado ainda. Use o código do responsável para liberar o atendimento.
               </div>
             )}
           </div>

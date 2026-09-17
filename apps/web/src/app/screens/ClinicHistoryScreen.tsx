@@ -116,7 +116,7 @@ export default function ClinicHistoryScreen() {
           <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
             <p className="text-sm text-muted-foreground">Avaliações</p>
             <p className="mt-2 text-3xl font-medium text-foreground">{clinicReviews.length}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Retorno dos tutores após os atendimentos.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Retorno dos responsáveis após os atendimentos.</p>
           </div>
           <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
             <p className="text-sm text-muted-foreground">Média</p>
@@ -152,7 +152,7 @@ export default function ClinicHistoryScreen() {
               }`}
             >
               <p className="text-sm font-medium">Avaliações recebidas</p>
-              <p className="mt-1 text-xs opacity-80">Notas e comentários dos tutores.</p>
+              <p className="mt-1 text-xs opacity-80">Notas e comentários dos responsáveis.</p>
             </button>
           </div>
         </section>

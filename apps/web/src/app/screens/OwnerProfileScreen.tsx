@@ -179,7 +179,7 @@ export default function OwnerProfileScreen() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mb-1 text-red-700">Excluir conta</p>
-              <p className="text-sm text-red-600/80">Seus pets vinculados permanecem no sistema sem tutor. Se houver registros dependentes, a exclusão pode ser bloqueada.</p>
+              <p className="text-sm text-red-600/80">Seus pets vinculados permanecem no sistema sem responsável. Se houver registros dependentes, a exclusão pode ser bloqueada.</p>
             </div>
             <button type="button" onClick={() => setDeleteDialogOpen(true)} disabled={saving || deleting} className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-red-600 px-5 py-3 text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50">
               <Trash2 className="h-4 w-4" />
@@ -193,7 +193,7 @@ export default function OwnerProfileScreen() {
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão da conta</AlertDialogTitle>
-            <AlertDialogDescription>Digite EXCLUIR para confirmar. Seus pets continuarão no sistema sem tutor, e quaisquer dependências podem impedir a exclusão.</AlertDialogDescription>
+            <AlertDialogDescription>Digite EXCLUIR para confirmar. Seus pets continuarão no sistema sem responsável, e quaisquer dependências podem impedir a exclusão.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2">
             <label className="block text-sm text-foreground">Confirme digitando EXCLUIR</label>

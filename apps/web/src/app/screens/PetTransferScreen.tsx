@@ -71,7 +71,7 @@ export default function PetTransferScreen() {
 
     const email = targetTutorEmail.trim();
     if (!email) {
-      setFeedback({ type: 'error', message: 'Informe o e-mail do novo tutor.' });
+      setFeedback({ type: 'error', message: 'Informe o e-mail do novo responsável pelo animal.' });
       return;
     }
 
@@ -192,7 +192,7 @@ export default function PetTransferScreen() {
 
                 <div className="space-y-5">
                   <div>
-                    <label className="mb-2 block text-foreground">E-mail do novo tutor</label>
+                    <label className="mb-2 block text-foreground">E-mail do novo responsável pelo animal</label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                       <input
@@ -200,11 +200,11 @@ export default function PetTransferScreen() {
                         value={targetTutorEmail}
                         onChange={(e) => setTargetTutorEmail(e.target.value)}
                         className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary"
-                        placeholder="novo.tutor@email.com"
+                        placeholder="novo.responsavel@email.com"
                         required
                       />
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground">O e-mail deve pertencer a uma conta de tutor já cadastrada.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">O e-mail deve pertencer a uma conta de responsável pelo animal já cadastrada.</p>
                   </div>
 
                   <div>
@@ -255,7 +255,7 @@ export default function PetTransferScreen() {
                   </div>
                   <div>
                     <h2 className="text-2xl font-medium text-red-700">Atenção</h2>
-                    <p className="text-red-600/80">Após a transferência, o novo tutor passa a ser o responsável principal pelos pets selecionados.</p>
+                    <p className="text-red-600/80">Após a transferência, o novo responsável passa a ser o responsável principal pelos pets selecionados.</p>
                   </div>
                 </div>
 
@@ -263,7 +263,7 @@ export default function PetTransferScreen() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="mb-1 text-red-700">Confirmação irreversível</p>
-                      <p className="text-sm text-red-600/80">Garanta que o e-mail informado pertence ao tutor correto antes de concluir a operação.</p>
+                      <p className="text-sm text-red-600/80">Garanta que o e-mail informado pertence ao responsável correto antes de concluir a operação.</p>
                     </div>
                     <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs text-red-700">Transferência</span>
                   </div>

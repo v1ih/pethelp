@@ -82,7 +82,7 @@ export function TutorShell({ active, title, description, actions, children }: Tu
             <div className="hidden text-right md:block">
               <p className="text-sm text-muted-foreground">Olá, {user?.name || 'Tutor'}</p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Tutor</span>
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Responsável pelo animal</span>
             <ThemeToggle />
             <button
               type="button"

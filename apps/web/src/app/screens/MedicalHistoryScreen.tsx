@@ -80,7 +80,7 @@ export default function MedicalHistoryScreen() {
     const veterinarianAverage = getVeterinarianAverage(user?.id ?? '');
 
     return (
-      <VeterinarianShell active="history" title="Histórico & Avaliações" description="Consulte atendimentos recentes e avaliações deixadas pelos tutores.">
+      <VeterinarianShell active="history" title="Histórico & Avaliações" description="Consulte atendimentos recentes e avaliações deixadas pelos responsáveis.">
         <div className="space-y-6">
           <section className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
