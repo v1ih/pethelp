@@ -1,6 +1,8 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Calendar, Clock, Lock, Mail, MessageSquare, PenLine, Plus, Star, Trash2, X } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarPlus, Clock, LayoutList, Lock, Mail, MessageSquare, PenLine, Plus, Star, Trash2, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { useInteraction } from '../context/InteractionContext';
 import { usePets } from '../context/PetsContext';
 import { useReviews } from '../context/ReviewsContext';
@@ -8,6 +10,28 @@ import { useSession } from '../context/SessionContext';
 import { getApiBase, getAuthHeaders, type Appointment } from '../context/shared';
 import { TutorShell } from '../components/layout/TutorShell';
 import SearchablePicker, { type SearchablePickerItem } from '../components/forms/SearchablePicker';
+import MonthCalendar from '../components/calendar/MonthCalendar';
+
+const STATUS_LABEL: Record<Appointment['status'], string> = {
+  scheduled: 'Agendada',
+  completed: 'Concluída',
+  cancelled: 'Cancelada',
+};
+
+const STATUS_BADGE: Record<Appointment['status'], string> = {
+  scheduled: 'bg-primary/10 text-primary',
+  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  cancelled: 'bg-rose-500/10 text-rose-600',
+};
+
+/** Formats a date-only string (YYYY-MM-DD) as a friendly local label. */
+function formatDayLabel(value: string) {
+  try {
+    return format(parseISO(`${value}T12:00:00`), "EEEE, d 'de' MMMM", { locale: ptBR });
+  } catch {
+    return value;
+  }
+}
 
 type CatalogEntry = SearchablePickerItem & {
   type: 'clinic' | 'veterinarian';
@@ -105,12 +129,31 @@ export default function AppointmentsScreen() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [view, setView] = useState<'calendar' | 'list'>('calendar');
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // The /api/appointments/me endpoint already scopes results to the current user
   // (by tutor/clinic/veterinarian profile), so no extra client-side owner filter is needed.
   const userAppointments = appointments;
   const scheduled = userAppointments.filter((a) => a.status === 'scheduled');
   const completed = userAppointments.filter((a) => a.status === 'completed');
+  const isOwner = user?.userType === 'owner';
+  const selectedDayAppointments = useMemo(
+    () =>
+      selectedDay
+        ? userAppointments
+            .filter((appointment) => appointment.date === selectedDay)
+            .sort((a, b) => (a.time ?? '').localeCompare(b.time ?? ''))
+        : [],
+    [selectedDay, userAppointments]
+  );
+
+  const openNewAppointmentForDay = (day: string | null) => {
+    if (day && isOwner) {
+      setDate(day);
+      setShowNewAppointment(true);
+    }
+  };
   const activeReviewAppointment = reviewAppointmentId ? userAppointments.find((appointment) => appointment.id === reviewAppointmentId) ?? null : null;
   const activeReview = activeReviewAppointment ? getReviewForAppointment(activeReviewAppointment.id) : null;
   const selectedClinicItem = clinicItems.find((item) => item.id === selectedClinicId) ?? null;
@@ -576,6 +619,88 @@ export default function AppointmentsScreen() {
           </section>
         )}
 
+        <div className="flex w-max items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setView('calendar')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${
+              view === 'calendar' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Calendário
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${
+              view === 'list' ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <LayoutList className="h-4 w-4" />
+            Lista
+          </button>
+        </div>
+
+        {view === 'calendar' && (
+          <section className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
+            <MonthCalendar appointments={userAppointments} selectedDate={selectedDay} onSelectDate={setSelectedDay} />
+
+            <div className="mt-6 border-t border-border pt-5">
+              {selectedDay ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-lg font-medium text-foreground first-letter:uppercase">{formatDayLabel(selectedDay)}</h3>
+                    {isOwner ? (
+                      <button
+                        type="button"
+                        onClick={() => openNewAppointmentForDay(selectedDay)}
+                        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm text-white transition-colors hover:bg-primary/90"
+                      >
+                        <CalendarPlus className="h-4 w-4" />
+                        Agendar neste dia
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {selectedDayAppointments.length === 0 ? (
+                    <p className="py-2 text-sm text-muted-foreground">Nenhuma consulta neste dia.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedDayAppointments.map((appointment) => (
+                        <div key={appointment.id} className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/25 p-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <Clock className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-foreground">
+                              <span className="tabular-nums">{appointment.time?.slice(0, 5)}</span> · {appointment.petName}
+                            </p>
+                            <p className="truncate text-sm text-muted-foreground">{appointment.reason}</p>
+                            <p className="truncate text-xs text-muted-foreground">{appointment.veterinarianName || appointment.clinicName}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[appointment.status]}`}>
+                            {STATUS_LABEL[appointment.status]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <CalendarDays className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Clique em um dia no calendário para ver as consultas{isOwner ? ' ou agendar uma nova' : ''}.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {view === 'list' && (
+          <>
         <section className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-2xl font-medium text-foreground">Agendadas</h2>
@@ -655,6 +780,8 @@ export default function AppointmentsScreen() {
             </div>
           )}
         </section>
+          </>
+        )}
       </div>
 
       {activeReviewAppointment && (
