@@ -7,6 +7,15 @@ type AccessResult =
   | { allowed: true; pet: { id: string; current_tutor_id: string | null; linked_clinic_id: string | null } }
   | { allowed: false; status: 403 | 404; message: 'Forbidden' | 'Pet not found' };
 
+/** True when the tutor is a shared guardian (guarda compartilhada) of the pet. */
+export async function isTutorGuardianOfPet(petId: string, tutorId: string): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'SELECT 1 FROM pet_guardians WHERE pet_id = ? AND tutor_id = ? LIMIT 1',
+    [petId, tutorId]
+  );
+  return rows.length > 0;
+}
+
 /** Authorizes a pet resource for its tutor, linked clinic, approved veterinarian, or valid Vet-Pass holder. */
 export async function canAccessPetHealthData(user: AuthRequest['user'], petId: string): Promise<AccessResult> {
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -18,7 +27,10 @@ export async function canAccessPetHealthData(user: AuthRequest['user'], petId: s
 
   if (user?.userType === 'tutor') {
     const tutor = await findTutorByUserId(user.id);
-    return tutor?.id === pet.current_tutor_id ? { allowed: true, pet } : { allowed: false, status: 403, message: 'Forbidden' };
+    if (tutor?.id && (tutor.id === pet.current_tutor_id || (await isTutorGuardianOfPet(pet.id, tutor.id)))) {
+      return { allowed: true, pet };
+    }
+    return { allowed: false, status: 403, message: 'Forbidden' };
   }
 
   if (user?.userType === 'clinic') {

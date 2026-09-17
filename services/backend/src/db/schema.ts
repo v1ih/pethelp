@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS vet_passes (
   redeemed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP NOT NULL, redeemed_at TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Guarda compartilhada: responsáveis adicionais (além do responsável principal em pets.current_tutor_id).
+CREATE TABLE IF NOT EXISTS pet_guardians (
+  id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
+  tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT uq_pet_guardian UNIQUE (pet_id, tutor_id)
+);
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END; $$ LANGUAGE plpgsql;

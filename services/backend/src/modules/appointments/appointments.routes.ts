@@ -5,6 +5,7 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { findClinicByUserId, findTutorByUserId, findVeterinarianByUserId } from '../users/users.service.js';
+import { isTutorGuardianOfPet } from '../pets/pet-access.js';
 import { asTrimmedString, formatDate, getWeekdayKey, isWithinRange, timeToMinutes } from './appointments.utils.js';
 
 type AppointmentRow = RowDataPacket & {
@@ -275,7 +276,8 @@ async function canAccessPet(user: AuthRequest['user'], petId: string) {
 
   if (user?.userType === 'tutor') {
     const tutorId = await resolveCurrentTutorId(user);
-    if (!tutorId || pet.current_tutor_id !== tutorId) {
+    const isGuardian = Boolean(tutorId) && (pet.current_tutor_id === tutorId || (await isTutorGuardianOfPet(pet.id, tutorId!)));
+    if (!isGuardian) {
       return { allowed: false, status: 403, message: 'Forbidden' as const };
     }
   }

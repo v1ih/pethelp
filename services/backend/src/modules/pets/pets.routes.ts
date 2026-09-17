@@ -11,6 +11,7 @@ import {
   findUserByEmail,
   findVeterinarianByUserId,
 } from '../users/users.service.js';
+import { isTutorGuardianOfPet } from './pet-access.js';
 
 type PetRow = RowDataPacket & {
   id: string;
@@ -216,8 +217,9 @@ petsRouter.get('/', async (req: AuthRequest, res, next) => {
         return;
       }
 
-      conditions.push('current_tutor_id = ?');
-      values.push(effectiveTutorId);
+      // Inclui pets próprios e os compartilhados (guarda compartilhada).
+      conditions.push('(current_tutor_id = ? OR id IN (SELECT pet_id FROM pet_guardians WHERE tutor_id = ?))');
+      values.push(effectiveTutorId, effectiveTutorId);
     } else if (req.user?.userType === 'clinic') {
       if (!clinicId) {
         res.status(404).json({ message: 'Clinic profile not found' });
@@ -264,9 +266,12 @@ petsRouter.get('/:id', async (req: AuthRequest, res, next) => {
     const clinicId = await resolveCurrentClinicId(req.user);
     const accessibleClinicIds = req.user?.userType === 'veterinarian' ? await resolveAccessibleClinicIdsForVeterinarian(req.user) : [];
 
-    if (req.user?.userType === 'tutor' && (!tutorId || row.current_tutor_id !== tutorId)) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
+    if (req.user?.userType === 'tutor') {
+      const isGuardian = Boolean(tutorId) && (row.current_tutor_id === tutorId || (await isTutorGuardianOfPet(row.id, tutorId!)));
+      if (!isGuardian) {
+        res.status(403).json({ message: 'Forbidden' });
+        return;
+      }
     }
 
     if (req.user?.userType === 'clinic' && (!clinicId || row.linked_clinic_id !== clinicId)) {
@@ -620,6 +625,135 @@ petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
     next(error);
   } finally {
     connection.release();
+  }
+});
+
+// ---- Guarda compartilhada (co-responsáveis pelo animal) ----
+
+type GuardianRow = RowDataPacket & {
+  tutor_id: string;
+  name: string;
+  email: string;
+  is_primary: boolean;
+};
+
+async function loadPetGuardians(petId: string) {
+  const [rows] = await pool.query<GuardianRow[]>(
+    `
+      SELECT t.id AS tutor_id, t.name AS name, u.email AS email, TRUE AS is_primary
+      FROM pets p
+      JOIN tutors t ON t.id = p.current_tutor_id
+      JOIN users u ON u.id = t.user_id
+      WHERE p.id = ?
+      UNION ALL
+      SELECT t.id AS tutor_id, t.name AS name, u.email AS email, FALSE AS is_primary
+      FROM pet_guardians g
+      JOIN tutors t ON t.id = g.tutor_id
+      JOIN users u ON u.id = t.user_id
+      WHERE g.pet_id = ?
+      ORDER BY is_primary DESC, name ASC
+    `,
+    [petId, petId]
+  );
+
+  return rows.map((row) => ({
+    tutorId: String(row.tutor_id),
+    name: row.name,
+    email: row.email,
+    isPrimary: Boolean(row.is_primary),
+  }));
+}
+
+/** Lists the primary owner plus any shared guardians of the pet. */
+petsRouter.get('/:id/guardians', async (req: AuthRequest, res, next) => {
+  try {
+    const pet = await loadPetById(pool, String(req.params.id));
+    if (!pet) {
+      res.status(404).json({ message: 'Pet not found' });
+      return;
+    }
+
+    const tutorId = await resolveCurrentTutorId(req.user);
+    const canView = Boolean(tutorId) && (pet.current_tutor_id === tutorId || (await isTutorGuardianOfPet(pet.id, tutorId!)));
+    if (!canView) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    res.json({ data: await loadPetGuardians(pet.id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Adds a shared guardian (by e-mail) to the pet. Only the primary owner can do this. */
+petsRouter.post('/:id/guardians', async (req: AuthRequest, res, next) => {
+  try {
+    const pet = await loadPetById(pool, String(req.params.id));
+    if (!pet) {
+      res.status(404).json({ message: 'Pet not found' });
+      return;
+    }
+
+    const tutorId = await resolveCurrentTutorId(req.user);
+    if (!canManagePet(tutorId, pet)) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email) {
+      res.status(400).json({ message: 'email is required' });
+      return;
+    }
+
+    const targetUser = await findUserByEmail(email);
+    if (!targetUser || targetUser.user_type !== 'tutor') {
+      res.status(404).json({ message: 'Nenhum responsável encontrado com esse e-mail' });
+      return;
+    }
+
+    const targetTutor = await findTutorByUserId(targetUser.id);
+    if (!targetTutor) {
+      res.status(404).json({ message: 'Perfil do responsável não encontrado' });
+      return;
+    }
+
+    if (targetTutor.id === pet.current_tutor_id) {
+      res.status(400).json({ message: 'Esse responsável já é o responsável principal do pet' });
+      return;
+    }
+
+    await pool.execute(
+      'INSERT INTO pet_guardians (id, pet_id, tutor_id) VALUES (?, ?, ?) ON CONFLICT (pet_id, tutor_id) DO NOTHING',
+      [randomUUID(), pet.id, targetTutor.id]
+    );
+
+    res.status(201).json({ data: await loadPetGuardians(pet.id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Removes a shared guardian from the pet. Only the primary owner can do this. */
+petsRouter.delete('/:id/guardians/:tutorId', async (req: AuthRequest, res, next) => {
+  try {
+    const pet = await loadPetById(pool, String(req.params.id));
+    if (!pet) {
+      res.status(404).json({ message: 'Pet not found' });
+      return;
+    }
+
+    const tutorId = await resolveCurrentTutorId(req.user);
+    if (!canManagePet(tutorId, pet)) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    await pool.execute('DELETE FROM pet_guardians WHERE pet_id = ? AND tutor_id = ?', [pet.id, String(req.params.tutorId)]);
+    res.json({ data: await loadPetGuardians(pet.id) });
+  } catch (error) {
+    next(error);
   }
 });
 

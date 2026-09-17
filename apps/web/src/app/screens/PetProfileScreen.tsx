@@ -6,6 +6,7 @@ import { usePets } from '../context/PetsContext';
 import { useSession } from '../context/SessionContext';
 import { useAppNavigation } from '../navigation';
 import { TutorShell } from '../components/layout/TutorShell';
+import SharedGuardians from '../components/pets/SharedGuardians';
 
 export default function PetProfileScreen() {
   const navigate = useNavigate();
@@ -167,6 +168,8 @@ export default function PetProfileScreen() {
             <p className="text-sm text-muted-foreground">Agendar visitas</p>
           </button>
         </section>
+
+        {user?.userType === 'owner' && <SharedGuardians petId={currentPet.id} />}
 
         {petRecords.length > 0 && (
           <section className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
