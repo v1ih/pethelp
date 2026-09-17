@@ -51,7 +51,16 @@ export default function RegisterScreen() {
       navigate(getDashboardRouteForUserType(resolvedUserType), { replace: true });
     } catch (error) {
       console.error('Falha ao cadastrar:', error);
-      setMessage({ type: 'error', text: 'Nao foi possivel criar a conta.' });
+      const raw = error instanceof Error ? error.message : '';
+      let text = 'Não foi possível criar a conta. Confira os dados e tente novamente.';
+      if (/already registered|já cadastrad/i.test(raw)) {
+        text = 'Este e-mail já está cadastrado. Faça login ou use outro e-mail.';
+      } else if (/servidor|backend|Failed to fetch|NetworkError/i.test(raw)) {
+        text = 'Não foi possível falar com o servidor. Verifique sua conexão e tente novamente.';
+      } else if (raw) {
+        text = raw;
+      }
+      setMessage({ type: 'error', text });
     } finally {
       setLoading(false);
     }
