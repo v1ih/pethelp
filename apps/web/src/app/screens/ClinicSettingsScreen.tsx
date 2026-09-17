@@ -146,22 +146,22 @@ export default function ClinicSettingsScreen() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-foreground">Nome fantasia</label>
-                <input value={tradeName} onChange={(e) => setTradeName(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={tradeName} onChange={(e) => setTradeName(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">CNPJ</label>
-                <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-foreground">Telefone</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">Endereço</label>
-                <input value={address} onChange={(e) => setAddress(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={address} onChange={(e) => setAddress(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
             </div>
 

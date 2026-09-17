@@ -80,7 +80,7 @@ export default function ConnectionScreen() {
               <label className="mb-3 block text-foreground">Código de Conexão da Clínica</label>
               <div className="relative mb-6">
                 <QrCode className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input type="text" value={clinicCode} onChange={(e) => setClinicCode(e.target.value.toUpperCase())} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-4 pl-12 pr-4 text-center text-lg tracking-wider uppercase text-foreground outline-none transition-colors focus:border-primary" placeholder="CLINICA1234" required />
+                <input type="text" value={clinicCode} onChange={(e) => setClinicCode(e.target.value.toUpperCase())} className="w-full rounded-[18px] border border-border bg-input-background py-4 pl-12 pr-4 text-center text-lg tracking-wider uppercase text-foreground outline-none transition-colors focus:border-primary" placeholder="CLINICA1234" required />
               </div>
               <button type="submit" disabled={loading || !currentPet} className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary py-4 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">{loading ? 'Conectando...' : 'Vincular Clínica'}</button>
             </form>

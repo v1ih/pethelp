@@ -227,7 +227,7 @@ export default function ExamsScreen() {
                       value={vetPassCode}
                       onChange={(event) => setVetPassCode(event.target.value.toUpperCase())}
                       placeholder="VET-..."
-                      className="flex-1 rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 uppercase tracking-wider text-foreground outline-none transition-colors focus:border-primary"
+                      className="flex-1 rounded-[18px] border border-border bg-input-background px-4 py-3 uppercase tracking-wider text-foreground outline-none transition-colors focus:border-primary"
                     />
                     <button type="button" onClick={() => void handleRedeemVetPass()} className="rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90">Abrir</button>
                   </div>

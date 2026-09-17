@@ -199,7 +199,7 @@ export default function PetTransferScreen() {
                         type="email"
                         value={targetTutorEmail}
                         onChange={(e) => setTargetTutorEmail(e.target.value)}
-                        className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary"
+                        className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary"
                         placeholder="novo.tutor@email.com"
                         required
                       />
@@ -215,7 +215,7 @@ export default function PetTransferScreen() {
                         type="text"
                         value={securityConfirmation}
                         onChange={(e) => setSecurityConfirmation(e.target.value)}
-                        className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground uppercase outline-none transition-colors focus:border-primary"
+                        className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground uppercase outline-none transition-colors focus:border-primary"
                         placeholder="TRANSFERIR"
                         required
                       />

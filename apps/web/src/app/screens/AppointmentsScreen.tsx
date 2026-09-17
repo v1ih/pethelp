@@ -489,7 +489,7 @@ export default function AppointmentsScreen() {
                       setSelectedCatalogId('');
                       setAvailability(initialAvailability);
                     }}
-                    className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none focus:border-primary"
+                    className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none focus:border-primary"
                   >
                     <option value="clinic">Clínica</option>
                     <option value="veterinarian">Veterinário</option>
@@ -504,7 +504,7 @@ export default function AppointmentsScreen() {
                       value={vetPassCode}
                       onChange={(event) => setVetPassCode(event.target.value.toUpperCase())}
                       placeholder="VET-... (deixe em branco se não tiver)"
-                      className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 uppercase tracking-wider text-foreground outline-none transition-colors focus:border-primary"
+                      className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 uppercase tracking-wider text-foreground outline-none transition-colors focus:border-primary"
                     />
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">Só é necessário se você quiser liberar exames anexados ao veterinário.</p>
@@ -590,21 +590,21 @@ export default function AppointmentsScreen() {
                   <label className="mb-2 block text-foreground">Data</label>
                   <div className="relative">
                     <Calendar className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
+                    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
                   </div>
                 </div>
                 <div>
                   <label className="mb-2 block text-foreground">Horário</label>
                   <div className="relative">
                     <Clock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
+                    <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
                   </div>
                 </div>
               </div>
 
               <div>
                 <label className="mb-2 block text-foreground">Motivo</label>
-                <textarea value={reason} onChange={(e) => setReason(e.target.value)} className="min-h-[110px] w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" rows={3} placeholder="Ex: Checkup anual, vacinação, sintomas de prostração, etc." required />
+                <textarea value={reason} onChange={(e) => setReason(e.target.value)} className="min-h-[110px] w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" rows={3} placeholder="Ex: Checkup anual, vacinação, sintomas de prostração, etc." required />
               </div>
 
               <div className={`rounded-[22px] border px-4 py-3 text-sm ${availability.isAvailable === false ? 'border-amber-200 bg-amber-50 text-amber-800' : availability.isAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-border bg-muted/20 text-muted-foreground'}`}>

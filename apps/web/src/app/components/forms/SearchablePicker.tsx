@@ -37,7 +37,7 @@ export default function SearchablePicker({ label, placeholder, items, selectedId
         onChange={(event) => setQuery(event.target.value)}
         onFocus={() => setQuery((current) => current)}
         placeholder={placeholder}
-        className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+        className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
       />
       <div className="max-h-56 overflow-auto rounded-[22px] border border-border/70 bg-card shadow-sm">
         {filteredItems.length === 0 ? (

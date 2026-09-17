@@ -112,7 +112,7 @@ export default function PetRegistrationScreen() {
                   };
                   reader.readAsDataURL(file);
                 }}
-                className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-center text-foreground outline-none transition-colors focus:border-primary"
+                className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-center text-foreground outline-none transition-colors focus:border-primary"
               />
             </div>
           </div>
@@ -122,41 +122,41 @@ export default function PetRegistrationScreen() {
               <label htmlFor="petName" className="mb-2 block text-foreground">
                 Nome do Pet <span className="text-destructive">*</span>
               </label>
-              <input type="text" id="petName" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Max" required />
+              <input type="text" id="petName" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Max" required />
             </div>
 
             <div>
               <label htmlFor="species" className="mb-2 block text-foreground">
                 Espécie <span className="text-destructive">*</span>
               </label>
-              <input type="text" id="species" value={species} onChange={(e) => setSpecies(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Cachorro, Gato, etc." required />
+              <input type="text" id="species" value={species} onChange={(e) => setSpecies(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Cachorro, Gato, etc." required />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="age" className="mb-2 block text-foreground">Idade</label>
-                <input type="text" id="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="3 anos" />
+                <input type="text" id="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="3 anos" />
               </div>
               <div>
                 <label htmlFor="breed" className="mb-2 block text-foreground">Raça</label>
-                <input type="text" id="breed" value={breed} onChange={(e) => setBreed(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Golden Retriever" />
+                <input type="text" id="breed" value={breed} onChange={(e) => setBreed(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Golden Retriever" />
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="weight" className="mb-2 block text-foreground">Peso</label>
-                <input type="text" id="weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="25 kg" />
+                <input type="text" id="weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="25 kg" />
               </div>
               <div>
                 <label htmlFor="allergies" className="mb-2 block text-foreground">Alergias</label>
-                <input type="text" id="allergies" value={allergiesStr} onChange={(e) => setAllergiesStr(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="ex: Amendoim, Poeira" />
+                <input type="text" id="allergies" value={allergiesStr} onChange={(e) => setAllergiesStr(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="ex: Amendoim, Poeira" />
               </div>
             </div>
 
             <div>
               <label htmlFor="conditions" className="mb-2 block text-foreground">Condições</label>
-              <input type="text" id="conditions" value={conditionsStr} onChange={(e) => setConditionsStr(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="ex: Diabetes, Artrite" />
+              <input type="text" id="conditions" value={conditionsStr} onChange={(e) => setConditionsStr(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="ex: Diabetes, Artrite" />
             </div>
           </div>
 

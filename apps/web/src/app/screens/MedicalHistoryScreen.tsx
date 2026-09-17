@@ -102,11 +102,11 @@ export default function MedicalHistoryScreen() {
 
           <section className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
             <div className="flex items-center gap-8 border-b border-border/80">
-              <button type="button" onClick={() => setVetTab('consults')} className={`relative pb-4 pt-2 text-[18px] font-medium transition-colors ${vetTab === 'consults' ? 'text-primary' : 'text-[#7b6e61]'}`}>
+              <button type="button" onClick={() => setVetTab('consults')} className={`relative pb-4 pt-2 text-[18px] font-medium transition-colors ${vetTab === 'consults' ? 'text-primary' : 'text-muted-foreground'}`}>
                 Consultas realizadas
                 {vetTab === 'consults' ? <span className="absolute inset-x-0 bottom-[-1px] h-[2px] rounded-full bg-primary" /> : null}
               </button>
-              <button type="button" onClick={() => setVetTab('reviews')} className={`relative pb-4 pt-2 text-[18px] font-medium transition-colors ${vetTab === 'reviews' ? 'text-primary' : 'text-[#7b6e61]'}`}>
+              <button type="button" onClick={() => setVetTab('reviews')} className={`relative pb-4 pt-2 text-[18px] font-medium transition-colors ${vetTab === 'reviews' ? 'text-primary' : 'text-muted-foreground'}`}>
                 Avaliações recebidas
                 {vetTab === 'reviews' ? <span className="absolute inset-x-0 bottom-[-1px] h-[2px] rounded-full bg-primary" /> : null}
               </button>
@@ -301,22 +301,22 @@ export default function MedicalHistoryScreen() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-2 block text-sm text-foreground">Data do Evento *</label>
-                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm text-foreground">Clínica / Hospital (Opcional)</label>
-                  <input type="text" value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="Ex: Clínica Veterinária São Francisco" className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                  <input type="text" value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="Ex: Clínica Veterinária São Francisco" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
                 </div>
               </div>
 
               <div>
                 <label className="mb-2 block text-sm text-foreground">Descrição da Consulta / Sintomas *</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o motivo da consulta, diagnóstico ou sintomas apresentados..." className="min-h-[120px] w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o motivo da consulta, diagnóstico ou sintomas apresentados..." className="min-h-[120px] w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm text-foreground">Tratamento Prescrito / Medicamentos (Opcional)</label>
-                <textarea value={treatment} onChange={(e) => setTreatment(e.target.value)} placeholder="Ex: Antibiótico x de 12h em 12h por 7 dias, repouso..." className="min-h-[100px] w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <textarea value={treatment} onChange={(e) => setTreatment(e.target.value)} placeholder="Ex: Antibiótico x de 12h em 12h por 7 dias, repouso..." className="min-h-[100px] w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
 
               <div>

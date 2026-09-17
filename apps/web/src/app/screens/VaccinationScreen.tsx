@@ -88,23 +88,23 @@ export default function VaccinationScreen() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-foreground">Nome da Vacina *</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: V8, Raiva, Gripe Canina" className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: V8, Raiva, Gripe Canina" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">Data de Aplicação *</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" required />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">Próxima Dose (Opcional)</label>
-                <input type="date" value={nextDose} onChange={(e) => setNextDose(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input type="date" value={nextDose} onChange={(e) => setNextDose(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">Veterinário Responsável (Opcional)</label>
-                <input type="text" value={veterinarian} onChange={(e) => setVeterinarian(e.target.value)} placeholder="Nome do profissional ou CRMV" className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input type="text" value={veterinarian} onChange={(e) => setVeterinarian(e.target.value)} placeholder="Nome do profissional ou CRMV" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm text-foreground">Clínica / Local de Aplicação (Opcional)</label>
-                <input type="text" value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="Ex: Clínica PetHelp" className="w-full rounded-[18px] border border-border bg-[#efe9de] px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input type="text" value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="Ex: Clínica PetHelp" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">

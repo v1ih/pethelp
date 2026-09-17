@@ -277,7 +277,7 @@ export default function ManageVeterinariansScreen() {
                     value={inviteEmail}
                     onChange={(event) => setInviteEmail(event.target.value)}
                     placeholder="veterinario@exemplo.com"
-                    className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary"
+                    className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary"
                   />
                 </div>
               </div>

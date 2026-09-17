@@ -125,7 +125,7 @@ export default function OwnerProfileScreen() {
               <label className="mb-2 block text-foreground">Nome completo</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
               </div>
             </div>
 
@@ -145,7 +145,7 @@ export default function OwnerProfileScreen() {
               <label className="mb-2 block text-foreground">Telefone</label>
               <div className="relative">
                 <Phone className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" placeholder="(11) 99999-9999" />
+                <input type="tel" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" placeholder="(11) 99999-9999" />
               </div>
             </div>
 
@@ -153,7 +153,7 @@ export default function OwnerProfileScreen() {
               <label className="mb-2 block text-foreground">CPF</label>
               <div className="relative">
                 <IdCard className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <input type="text" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} className="w-full rounded-[18px] border border-border bg-[#efe9de] py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" placeholder="000.000.000-00" />
+                <input type="text" value={cpf} onChange={(e) => setCpf(formatCpf(e.target.value))} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" placeholder="000.000.000-00" />
               </div>
             </div>
 
