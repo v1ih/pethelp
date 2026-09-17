@@ -2,6 +2,7 @@
 import { ArrowLeftRight, Bell, ClipboardList, FileText, Home, Link2, LogOut, PawPrint, Settings, Syringe, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ThemeToggle } from './ThemeToggle';
+import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
@@ -153,6 +154,8 @@ export function TutorShell({ active, title, description, actions, children }: Tu
               </div>
             </section>
           ) : null}
+
+          <EmailVerificationBanner />
 
           {children}
         </main>

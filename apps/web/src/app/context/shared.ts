@@ -139,6 +139,7 @@ export interface User {
   workingHours?: Record<string, unknown> | null;
   crmv?: string;
   crmvUf?: string;
+  emailVerified?: boolean;
 }
 
 export type RegisterPayload = {
@@ -220,6 +221,7 @@ export function mapProfileToUser(profile: any): User {
     workingHours: parseJsonObject(profile.working_hours),
     crmv: profile.crmv ?? undefined,
     crmvUf: profile.crmv_uf ?? undefined,
+    emailVerified: Boolean(profile.email_verified),
   };
 }
 

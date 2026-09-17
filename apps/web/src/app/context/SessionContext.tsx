@@ -38,6 +38,8 @@ interface SessionContextValue {
   }) => Promise<User>;
   deactivateCurrentUserAccount: () => Promise<void>;
   deleteCurrentUserAccount: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerification: () => Promise<{ emailSent: boolean; code?: string }>;
   logout: () => void;
 }
 
@@ -290,6 +292,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     logout();
   };
 
+  const verifyEmail = async (code: string) => {
+    if (!user?.email) throw new Error('Sessão inválida');
+    const resp = await fetch(`${API_BASE}/api/auth/verify-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, code: code.trim() }),
+    });
+    if (!resp.ok) {
+      throw new Error((await resp.json().catch(() => null))?.message ?? 'Não foi possível verificar o e-mail.');
+    }
+    setUser((current) => (current ? { ...current, emailVerified: true } : current));
+  };
+
+  const resendVerification = async () => {
+    if (!user?.email) throw new Error('Sessão inválida');
+    const resp = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email }),
+    });
+    const payload = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(payload?.message ?? 'Não foi possível reenviar o código.');
+    }
+    return { emailSent: Boolean(payload?.emailSent), code: payload?.code };
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -304,6 +333,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         updateVeterinarianProfile,
         deactivateCurrentUserAccount,
         deleteCurrentUserAccount,
+        verifyEmail,
+        resendVerification,
         logout,
       }}
     >

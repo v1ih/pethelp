@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router';
 import { Bell, CalendarDays, ClipboardList, Home, Link2, LogOut, PawPrint, Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
@@ -148,6 +149,8 @@ export default function VeterinarianShell({ active, title, description, actions,
               {actions ? <div className="flex flex-wrap items-center gap-3">{actions}</div> : null}
             </div>
           ) : null}
+
+          <EmailVerificationBanner />
 
           {children}
         </main>

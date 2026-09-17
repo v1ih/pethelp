@@ -12,9 +12,26 @@ import {
   findUserByEmail,
   type UserType,
 } from '../users/users.service.js';
+import { createEmailCode, verifyEmailCode } from './email-codes.js';
+import { codeEmailTemplate, isEmailConfigured, sendEmail } from '../mail/mailer.js';
 
 const router = Router();
-const recoveryCodes = new Map<string, { code: string; expiresAt: number }>();
+
+/** Sends a verification code to the given e-mail (best-effort). */
+async function sendVerificationCode(email: string) {
+  const code = await createEmailCode(email, 'verification');
+  const { sent } = await sendEmail(
+    email,
+    'Confirme seu e-mail no PetHelp',
+    codeEmailTemplate(
+      'Confirme seu e-mail',
+      'Use o código abaixo para confirmar seu e-mail e ativar todos os recursos da sua conta.',
+      code,
+      'O código expira em 15 minutos. Se você não criou uma conta no PetHelp, ignore este e-mail.'
+    )
+  );
+  return { sent, code };
+}
 
 function normalizeUserType(value: unknown): UserType | null {
   if (value === 'tutor' || value === 'owner') {
@@ -154,7 +171,15 @@ router.post('/register', async (req, res, next) => {
 
     const token = jwt.sign({ sub: id, email, userType }, env.jwtSecret, { expiresIn: '7d' });
 
-    res.status(201).json({ id, token, userType });
+    // Envia o código de verificação de e-mail (não bloqueia o cadastro se falhar).
+    let verificationSent = false;
+    try {
+      verificationSent = (await sendVerificationCode(email)).sent;
+    } catch (mailError) {
+      console.error('Falha ao enviar código de verificação:', mailError);
+    }
+
+    res.status(201).json({ id, token, userType, emailVerified: false, verificationSent });
   } catch (error) {
     await connection.rollback();
     next(error);
@@ -191,7 +216,7 @@ router.post('/login', async (req, res, next) => {
     const token = jwt.sign({ sub: user.id, email: user.email, userType: user.user_type }, env.jwtSecret, {
       expiresIn: '7d',
     });
-    res.json({ id: user.id, token, userType: user.user_type });
+    res.json({ id: user.id, token, userType: user.user_type, emailVerified: Boolean(user.email_verified) });
   } catch (error) {
     next(error);
   }
@@ -211,15 +236,24 @@ router.post('/password-recovery/request', async (req, res, next) => {
       return;
     }
 
-    const code = generateRecoveryCode();
-    recoveryCodes.set(email, {
-      code,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    });
+    const code = await createEmailCode(email, 'recovery');
+    const { sent } = await sendEmail(
+      email,
+      'Código de recuperação de senha - PetHelp',
+      codeEmailTemplate(
+        'Recuperação de senha',
+        'Recebemos um pedido para redefinir sua senha. Use o código abaixo para continuar.',
+        code,
+        'O código expira em 15 minutos. Se não foi você, pode ignorar este e-mail.'
+      )
+    );
 
+    // Em produção (e-mail configurado) o código vai só por e-mail. Em desenvolvimento
+    // (sem BREVO_API_KEY) devolvemos o código para não travar os testes.
     res.json({
-      message: 'Recovery code generated',
-      code,
+      message: sent ? 'Enviamos um código para o seu e-mail.' : 'Código gerado (e-mail não configurado).',
+      emailSent: sent,
+      ...(isEmailConfigured() ? {} : { code }),
     });
   } catch (error) {
     next(error);
@@ -245,20 +279,9 @@ router.post('/password-recovery/confirm', async (req, res, next) => {
       return;
     }
 
-    const recovery = recoveryCodes.get(email);
-    if (!recovery) {
-      res.status(400).json({ message: 'Recovery code not requested' });
-      return;
-    }
-
-    if (recovery.expiresAt < Date.now()) {
-      recoveryCodes.delete(email);
-      res.status(410).json({ message: 'Recovery code expired' });
-      return;
-    }
-
-    if (recovery.code !== code) {
-      res.status(400).json({ message: 'Invalid recovery code' });
+    const valid = await verifyEmailCode(email, 'recovery', code);
+    if (!valid) {
+      res.status(400).json({ message: 'Código inválido ou expirado.' });
       return;
     }
 
@@ -267,14 +290,73 @@ router.post('/password-recovery/confirm', async (req, res, next) => {
     await connection.beginTransaction();
     await connection.execute('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, user.id]);
     await connection.commit();
-    recoveryCodes.delete(email);
 
-    res.json({ message: 'Password updated successfully' });
+    res.json({ message: 'Senha atualizada com sucesso.' });
   } catch (error) {
     await connection.rollback();
     next(error);
   } finally {
     connection.release();
+  }
+});
+
+// ---- Verificação de e-mail ----
+
+router.post('/verify-email', async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = asTrimmedString(req.body?.code);
+    if (!email || !code) {
+      res.status(400).json({ message: 'email and code are required' });
+      return;
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user) {
+      res.status(404).json({ message: 'Conta não encontrada.' });
+      return;
+    }
+
+    const valid = await verifyEmailCode(email, 'verification', code);
+    if (!valid) {
+      res.status(400).json({ message: 'Código inválido ou expirado.' });
+      return;
+    }
+
+    await pool.execute('UPDATE users SET email_verified = TRUE WHERE id = ?', [user.id]);
+    res.json({ message: 'E-mail verificado com sucesso.', emailVerified: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/resend-verification', async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!email) {
+      res.status(400).json({ message: 'email is required' });
+      return;
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user) {
+      res.status(404).json({ message: 'Conta não encontrada.' });
+      return;
+    }
+
+    if (user.email_verified) {
+      res.json({ message: 'E-mail já verificado.', emailVerified: true });
+      return;
+    }
+
+    const { sent, code } = await sendVerificationCode(email);
+    res.json({
+      message: sent ? 'Enviamos um novo código para o seu e-mail.' : 'Código gerado (e-mail não configurado).',
+      emailSent: sent,
+      ...(isEmailConfigured() ? {} : { code }),
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

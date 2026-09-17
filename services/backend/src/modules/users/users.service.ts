@@ -12,6 +12,7 @@ type AuthUserRow = RowDataPacket & {
   password_hash: string;
   user_type: UserType;
   is_active: boolean;
+  email_verified: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -115,6 +116,7 @@ export type PublicUserRecord = {
   email: string;
   user_type: UserType;
   userType: UserType;
+  email_verified: boolean;
   name: string;
   phone: string | null;
   cpf: string | null;
@@ -386,6 +388,7 @@ function toPublicUserRecord(user: AuthUserRow, profile: TutorRow | ClinicRow | V
       email: user.email,
       user_type: user.user_type,
       userType: user.user_type,
+      email_verified: Boolean(user.email_verified),
       name: tutor.name,
       phone: tutor.phone,
       cpf: tutor.cpf,
@@ -412,6 +415,7 @@ function toPublicUserRecord(user: AuthUserRow, profile: TutorRow | ClinicRow | V
       email: user.email,
       user_type: user.user_type,
       userType: user.user_type,
+      email_verified: Boolean(user.email_verified),
       name: clinic.trade_name,
       phone: clinic.phone,
       cpf: null,
@@ -437,6 +441,7 @@ function toPublicUserRecord(user: AuthUserRow, profile: TutorRow | ClinicRow | V
     email: user.email,
     user_type: user.user_type,
     userType: user.user_type,
+    email_verified: Boolean(user.email_verified),
     name: veterinarian.name,
     phone: veterinarian.phone,
     cpf: null,

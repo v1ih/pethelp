@@ -81,10 +81,14 @@ export default function LoginScreen() {
       }
 
       const data = await resp.json();
-      setRecoveryCode(data.code);
+      // Em produção o código vem só por e-mail; em desenvolvimento a API o devolve.
+      setRecoveryCode(typeof data.code === 'string' ? data.code : '');
       setRecoveryCodeInput('');
       setRecoveryStep('verify');
-      setRecoveryMessage({ type: 'success', text: `Código enviado para ${emailToUse.trim()}.` });
+      setRecoveryMessage({
+        type: 'success',
+        text: data.emailSent ? `Enviamos um código para ${emailToUse.trim()}. Confira seu e-mail.` : 'Código gerado (veja abaixo).',
+      });
     } catch (error) {
       console.error('Falha ao solicitar recuperacao de senha:', error);
       setRecoveryMessage({ type: 'error', text: 'Não foi possível enviar o código de recuperação.' });
@@ -125,8 +129,10 @@ export default function LoginScreen() {
     e.preventDefault();
     setRecoveryMessage(null);
 
-    if (recoveryCodeInput.trim() !== recoveryCode.trim()) {
-      setRecoveryMessage({ type: 'error', text: 'O código informado não confere.' });
+    // O código é validado no servidor no passo de redefinição. Aqui só garantimos
+    // que algo foi digitado antes de avançar.
+    if (!recoveryCodeInput.trim()) {
+      setRecoveryMessage({ type: 'error', text: 'Digite o código que você recebeu.' });
       return;
     }
 
@@ -151,7 +157,7 @@ export default function LoginScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: recoveryEmail.trim(),
-          code: recoveryCode.trim(),
+          code: recoveryCodeInput.trim(),
           newPassword: recoveryNewPassword,
         }),
       });
@@ -296,7 +302,7 @@ export default function LoginScreen() {
                 <form onSubmit={handleRecoveryCodeVerify}>
                   {recoveryCode ? (
                     <div className="auth-code-box">
-                      <div className="auth-code-label">Código enviado para {recoveryEmail}.</div>
+                      <div className="auth-code-label">Código para teste (e-mail não configurado):</div>
                       <div className="auth-code-value">{recoveryCode}</div>
                     </div>
                   ) : null}

@@ -47,4 +47,11 @@ export const env = {
     adminDatabase: process.env.POSTGRES_ADMIN_DATABASE ?? 'postgres',
   },
   jwtSecret: process.env.JWT_SECRET ?? 'please-change-this-in-prod',
+  // Envio de e-mail via Brevo (plano gratuito). Se não configurado, o código é
+  // apenas registrado no log (modo desenvolvimento).
+  mail: {
+    brevoApiKey: process.env.BREVO_API_KEY?.trim() || undefined,
+    from: process.env.MAIL_FROM?.trim() || undefined,
+    fromName: process.env.MAIL_FROM_NAME?.trim() || 'PetHelp',
+  },
 } as const;
