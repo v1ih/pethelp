@@ -36,6 +36,7 @@ export type PetMutationPayload = {
 export interface MedicalRecord {
   id: string;
   petId: string;
+  petName?: string;
   date: string;
   description: string;
   treatment?: string;
@@ -358,6 +359,7 @@ export function normalizeMedicalRecordFromApi(record: any): MedicalRecord {
   return {
     id: record.id,
     petId: record.petId ?? record.pet_id,
+    petName: record.petName ?? record.pet_name ?? undefined,
     date: record.date ?? record.recordDate ?? record.record_date,
     description: record.description ?? '',
     treatment: record.treatment ?? undefined,

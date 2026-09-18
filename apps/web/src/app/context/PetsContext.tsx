@@ -249,8 +249,8 @@ export function PetsProvider({ children }: { children: ReactNode }) {
     addNotification({
       userId: user?.id || '',
       type: 'connection',
-      title: 'Clinic Linked Successfully',
-      message: `Your pet has been linked to the clinic with code ${clinicCode}`,
+      title: 'Clínica vinculada com sucesso',
+      message: `Seu pet foi vinculado à clínica com o código ${clinicCode}.`,
       date: new Date().toISOString().split('T')[0],
       petId,
       read: false,

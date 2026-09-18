@@ -176,7 +176,7 @@ export default function ClinicHistoryScreen() {
                       <p className="text-sm text-muted-foreground">{appointment.reason}</p>
                       <div className="rounded-[20px] border border-border bg-muted/20 px-4 py-3">
                         <p className="text-sm text-foreground">{appointment.veterinarianName || appointment.clinicName || 'Atendimento clínico'}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Status do atendimento {appointment.status}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Status do atendimento: {appointment.status === 'completed' ? 'concluído' : appointment.status === 'cancelled' ? 'cancelado' : 'agendado'}</p>
                       </div>
                     </div>
 

@@ -9,6 +9,7 @@ import { canAccessPetHealthData } from '../pets/pet-access.js';
 type MedicalRecordRow = RowDataPacket & {
   id: string;
   pet_id: string;
+  pet_name: string | null;
   veterinarian_id: string | null;
   veterinarian_name: string | null;
   clinic_id: string | null;
@@ -99,6 +100,7 @@ function normalizeMedicalRecord(row: MedicalRecordRow) {
   return {
     id: row.id,
     petId: row.pet_id,
+    petName: row.pet_name ?? undefined,
     veterinarianId: row.veterinarian_id ?? undefined,
     veterinarianName: row.veterinarian_name ?? undefined,
     clinicId: row.clinic_id ?? undefined,
@@ -119,6 +121,7 @@ async function loadMedicalRecordById(db: DbClient, recordId: string) {
       SELECT
         mr.id,
         mr.pet_id,
+        p.name AS pet_name,
         mr.veterinarian_id,
         mr.veterinarian_name,
         mr.clinic_id,
@@ -131,6 +134,7 @@ async function loadMedicalRecordById(db: DbClient, recordId: string) {
         mr.created_at,
         mr.updated_at
       FROM medical_records mr
+      LEFT JOIN pets p ON p.id = mr.pet_id
       WHERE mr.id = ?
       LIMIT 1
     `,
@@ -155,6 +159,7 @@ router.get('/pet/:petId', async (req: AuthRequest, res, next) => {
         SELECT
           mr.id,
           mr.pet_id,
+          p.name AS pet_name,
           mr.veterinarian_id,
           mr.veterinarian_name,
           mr.clinic_id,
@@ -167,6 +172,7 @@ router.get('/pet/:petId', async (req: AuthRequest, res, next) => {
           mr.created_at,
           mr.updated_at
         FROM medical_records mr
+        LEFT JOIN pets p ON p.id = mr.pet_id
         WHERE mr.pet_id = ?
         ORDER BY mr.record_date DESC, mr.created_at DESC
       `,

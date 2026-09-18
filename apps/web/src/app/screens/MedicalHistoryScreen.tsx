@@ -133,7 +133,7 @@ export default function MedicalHistoryScreen() {
                         {record.treatment ? <p className="mt-3 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">{record.treatment}</p> : null}
                         <div className="mt-4 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                           <span className="rounded-full border border-border bg-background px-3 py-1">{attachments} anexo{attachments === 1 ? '' : 's'}</span>
-                          <span className="rounded-full border border-border bg-background px-3 py-1">{record.petId}</span>
+                          {record.petName ? <span className="rounded-full border border-border bg-background px-3 py-1">{record.petName}</span> : null}
                         </div>
                       </article>
                     );
@@ -149,7 +149,7 @@ export default function MedicalHistoryScreen() {
                     <article key={review.id} className="rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_18px_42px_-30px_rgba(127,162,106,0.2)]">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <p className="text-lg text-foreground">{review.tutorName} · {review.petId}</p>
+                          <p className="text-lg text-foreground">{review.tutorName}{review.petName ? ` · ${review.petName}` : ''}</p>
                           <p className="text-sm text-muted-foreground">{review.clinicName || 'Atendimento particular'}</p>
                         </div>
                         <div className="flex items-center gap-1 text-primary">
