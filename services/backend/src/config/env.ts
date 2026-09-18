@@ -54,4 +54,6 @@ export const env = {
     from: process.env.MAIL_FROM?.trim() || undefined,
     fromName: process.env.MAIL_FROM_NAME?.trim() || 'PetHelp',
   },
+  // Segredo usado para proteger a rota de lembretes chamada pelo Vercel Cron.
+  cronSecret: process.env.CRON_SECRET?.trim() || undefined,
 } as const;

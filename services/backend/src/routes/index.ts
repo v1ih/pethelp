@@ -10,6 +10,7 @@ import appointmentsRouter from '../modules/appointments/appointments.routes.js';
 import notificationsRouter from '../modules/notifications/notifications.routes.js';
 import reviewsRouter from '../modules/reviews/reviews.routes.js';
 import vetPassesRouter from '../modules/vet-passes/vet-passes.routes.js';
+import remindersRouter from '../modules/internal/reminders.routes.js';
 
 export const apiRouter = Router();
 
@@ -24,3 +25,4 @@ apiRouter.use('/clinic-links', clinicLinksRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/reviews', reviewsRouter);
 apiRouter.use('/vet-passes', vetPassesRouter);
+apiRouter.use('/internal', remindersRouter);
