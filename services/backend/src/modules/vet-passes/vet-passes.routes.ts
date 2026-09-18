@@ -18,6 +18,9 @@ type VetPassRow = RowDataPacket & {
   expires_at: Date | string;
   redeemed_at: Date | string | null;
   updated_at: Date;
+  includes_medical_records: boolean;
+  includes_vaccines: boolean;
+  includes_exams: boolean;
 };
 
 type DbClient = Pick<PoolConnection, 'execute' | 'query'>;
@@ -71,6 +74,9 @@ function normalizeVetPass(row: VetPassRow) {
           ? row.redeemed_at
           : row.redeemed_at.toISOString(),
     updatedAt: row.updated_at,
+    includesMedicalRecords: row.includes_medical_records,
+    includesVaccines: row.includes_vaccines,
+    includesExams: row.includes_exams,
   };
 }
 
@@ -94,7 +100,10 @@ async function loadVetPassByCode(db: DbClient, code: string) {
         created_at,
         expires_at,
         redeemed_at,
-        updated_at
+        updated_at,
+        includes_medical_records,
+        includes_vaccines,
+        includes_exams
       FROM vet_passes
       WHERE pass_code = ?
       LIMIT 1
@@ -149,7 +158,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const petId = asTrimmedString(body.petId);
     const petName = asTrimmedString(body.petName);
     const documents = parseDocuments(body.documents);
-    const expiresInDays = Number.isFinite(Number(body.expiresInDays)) ? Number(body.expiresInDays) : 30;
+    const rawDays = Number(body.expiresInDays);
+    // Validade configurável pelo responsável (1 a 90 dias), padrão 30.
+    const expiresInDays = Number.isFinite(rawDays) ? Math.min(90, Math.max(1, Math.round(rawDays))) : 30;
+    // Escopo por categoria: quando o campo não vier, mantém TRUE (compatível com o comportamento antigo).
+    const includesMedicalRecords = body.includesMedicalRecords === undefined ? true : Boolean(body.includesMedicalRecords);
+    const includesVaccines = body.includesVaccines === undefined ? true : Boolean(body.includesVaccines);
+    const includesExams = body.includesExams === undefined ? true : Boolean(body.includesExams);
 
     const pet = await loadPetById(connection, petId);
     if (!pet || pet.current_tutor_id !== tutorId) {
@@ -180,10 +195,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
           documents,
           redeemed_by_user_id,
           expires_at,
-          redeemed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          redeemed_at,
+          includes_medical_records,
+          includes_vaccines,
+          includes_exams
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [id, passCode, tutorId, petId, petName, JSON.stringify(documents), null, expiresAt, null]
+      [id, passCode, tutorId, petId, petName, JSON.stringify(documents), null, expiresAt, null, includesMedicalRecords, includesVaccines, includesExams]
     );
     await connection.commit();
 

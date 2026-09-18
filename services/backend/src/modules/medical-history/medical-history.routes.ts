@@ -135,7 +135,7 @@ async function loadMedicalRecordById(db: DbClient, recordId: string) {
         mr.updated_at
       FROM medical_records mr
       LEFT JOIN pets p ON p.id = mr.pet_id
-      WHERE mr.id = ?
+      WHERE mr.id = ? AND mr.deleted_at IS NULL
       LIMIT 1
     `,
     [recordId]
@@ -148,7 +148,7 @@ router.use(requireAuth);
 
 router.get('/pet/:petId', async (req: AuthRequest, res, next) => {
   try {
-    const access = await canAccessPetHealthData(req.user, String(req.params.petId));
+    const access = await canAccessPetHealthData(req.user, String(req.params.petId), 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
       return;
@@ -173,7 +173,7 @@ router.get('/pet/:petId', async (req: AuthRequest, res, next) => {
           mr.updated_at
         FROM medical_records mr
         LEFT JOIN pets p ON p.id = mr.pet_id
-        WHERE mr.pet_id = ?
+        WHERE mr.pet_id = ? AND mr.deleted_at IS NULL
         ORDER BY mr.record_date DESC, mr.created_at DESC
       `,
       [String(req.params.petId)]
@@ -193,7 +193,7 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const access = await canAccessPetHealthData(req.user, existing.pet_id);
+    const access = await canAccessPetHealthData(req.user, existing.pet_id, 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
       return;
@@ -209,7 +209,7 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
   const connection = await pool.getConnection();
 
   try {
-    const access = await canAccessPetHealthData(req.user, String(req.params.petId));
+    const access = await canAccessPetHealthData(req.user, String(req.params.petId), 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
       return;
@@ -285,7 +285,7 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const access = await canAccessPetHealthData(req.user, existing.pet_id);
+    const access = await canAccessPetHealthData(req.user, existing.pet_id, 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
       return;
@@ -381,14 +381,15 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const access = await canAccessPetHealthData(req.user, existing.pet_id);
+    const access = await canAccessPetHealthData(req.user, existing.pet_id, 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
       return;
     }
 
+    // Soft-delete: o RNF09 do TCC proíbe exclusão física de registros de saúde.
     const [result] = await connection.execute<ResultSetHeader>(
-      'DELETE FROM medical_records WHERE id = ?',
+      'UPDATE medical_records SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL',
       [String(req.params.id)]
     );
 

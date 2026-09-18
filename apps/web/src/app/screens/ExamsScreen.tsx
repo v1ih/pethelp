@@ -50,6 +50,8 @@ export default function ExamsScreen() {
   const [vetPassCode, setVetPassCode] = useState('');
   const [createdPass, setCreatedPass] = useState<VetPassRecord | null>(null);
   const [redeemedPass, setRedeemedPass] = useState<VetPassRecord | null>(null);
+  const [passScope, setPassScope] = useState({ medicalRecords: true, vaccines: true, exams: true });
+  const [passDays, setPassDays] = useState(30);
   const API_BASE = getApiBase();
 
   const attachments = useMemo(() => {
@@ -96,7 +98,10 @@ export default function ExamsScreen() {
           petName: currentPet.name,
           // Anexos são opcionais — se nenhum estiver selecionado, gera um passe sem exames.
           documents: selectedAttachments.map(({ name, type, size, dataUrl }) => ({ name, type, size, dataUrl })),
-          expiresInDays: 30,
+          expiresInDays: passDays,
+          includesMedicalRecords: passScope.medicalRecords,
+          includesVaccines: passScope.vaccines,
+          includesExams: passScope.exams,
         }),
       });
 
@@ -199,8 +204,45 @@ export default function ExamsScreen() {
             <div className="space-y-4">
               <section className="rounded-[34px] border border-border/70 bg-card p-5 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
                 <h2 className="mb-2 text-xl text-foreground">Gerar Vet-Pass</h2>
-                <p className="mb-4 text-sm text-muted-foreground">O código dá acesso temporário (30 dias) ao pet. Anexar exames é opcional — se selecionar, eles também ficam liberados.</p>
-                <button type="button" onClick={() => void handleGenerateVetPass()} className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
+                <p className="mb-4 text-sm text-muted-foreground">Você escolhe o que liberar e por quanto tempo. Anexar exames é opcional.</p>
+
+                <div className="mb-4 space-y-2">
+                  <p className="text-sm font-medium text-foreground">O que o veterinário poderá ver</p>
+                  {([
+                    { key: 'medicalRecords', label: 'Prontuário' },
+                    { key: 'vaccines', label: 'Vacinas' },
+                    { key: 'exams', label: 'Exames anexados' },
+                  ] as const).map((item) => (
+                    <label key={item.key} className="flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={passScope[item.key]}
+                        onChange={(e) => setPassScope((prev) => ({ ...prev, [item.key]: e.target.checked }))}
+                        className="h-4 w-4 accent-[var(--primary)]"
+                      />
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="pass-days" className="mb-1 block text-sm font-medium text-foreground">Validade (dias)</label>
+                  <input
+                    id="pass-days"
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={passDays}
+                    onChange={(e) => setPassDays(Math.min(90, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-28 rounded-[14px] border border-border bg-input-background px-3 py-2 text-foreground outline-none focus:border-primary"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateVetPass()}
+                  disabled={!passScope.medicalRecords && !passScope.vaccines && !passScope.exams}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
                   <ShieldCheck className="h-4 w-4" />
                   Gerar código
                 </button>

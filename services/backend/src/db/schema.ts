@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS medical_records (
   added_by VARCHAR(20) NOT NULL DEFAULT 'veterinarian' CHECK (added_by IN ('tutor','veterinarian','clinic')),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE medical_records ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 CREATE TABLE IF NOT EXISTS vaccines (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE RESTRICT, veterinarian_id UUID REFERENCES veterinarians(id) ON DELETE SET NULL,
   veterinarian_name VARCHAR(120), clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL, clinic_name VARCHAR(180), name VARCHAR(120) NOT NULL,
@@ -79,6 +80,7 @@ CREATE TABLE IF NOT EXISTS vaccines (
   added_by VARCHAR(20) NOT NULL DEFAULT 'veterinarian' CHECK (added_by IN ('tutor','veterinarian','clinic')),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE vaccines ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
 CREATE TABLE IF NOT EXISTS referrals (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE RESTRICT,
   veterinarian_id UUID NOT NULL REFERENCES veterinarians(id) ON DELETE RESTRICT, target_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL,
@@ -97,6 +99,10 @@ CREATE TABLE IF NOT EXISTS vet_passes (
   redeemed_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   expires_at TIMESTAMP NOT NULL, redeemed_at TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Escopo do Vet-Pass por categoria (responsável escolhe o que liberar). Default TRUE p/ passes antigos.
+ALTER TABLE vet_passes ADD COLUMN IF NOT EXISTS includes_medical_records BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE vet_passes ADD COLUMN IF NOT EXISTS includes_vaccines BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE vet_passes ADD COLUMN IF NOT EXISTS includes_exams BOOLEAN NOT NULL DEFAULT TRUE;
 -- Guarda compartilhada: responsáveis adicionais (além do responsável principal em pets.current_tutor_id).
 CREATE TABLE IF NOT EXISTS pet_guardians (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE,

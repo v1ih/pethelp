@@ -16,8 +16,16 @@ export async function isTutorGuardianOfPet(petId: string, tutorId: string): Prom
   return rows.length > 0;
 }
 
-/** Authorizes a pet resource for its tutor, linked clinic, approved veterinarian, or valid Vet-Pass holder. */
-export async function canAccessPetHealthData(user: AuthRequest['user'], petId: string): Promise<AccessResult> {
+/** Categoria de dado de saúde, usada para respeitar o escopo do Vet-Pass. */
+export type HealthCategory = 'medical_records' | 'vaccines' | 'exams';
+
+/**
+ * Authorizes a pet resource for its tutor, linked clinic, approved veterinarian, or valid Vet-Pass holder.
+ * When access comes ONLY from a Vet-Pass, the optional `category` is checked against the pass scope
+ * (o responsável pode liberar só vacinas, só prontuário, etc.). Tutor/clínica/vínculo aprovado não são
+ * afetados pelo escopo.
+ */
+export async function canAccessPetHealthData(user: AuthRequest['user'], petId: string, category?: HealthCategory): Promise<AccessResult> {
   const [rows] = await pool.query<RowDataPacket[]>(
     'SELECT id, current_tutor_id, linked_clinic_id FROM pets WHERE id = ? AND is_active = TRUE LIMIT 1',
     [petId]
@@ -49,10 +57,18 @@ export async function canAccessPetHealthData(user: AuthRequest['user'], petId: s
     }
 
     const [passes] = await pool.query<RowDataPacket[]>(
-      'SELECT id FROM vet_passes WHERE pet_id = ? AND redeemed_by_user_id = ? AND expires_at >= CURRENT_TIMESTAMP LIMIT 1',
+      `SELECT includes_medical_records, includes_vaccines, includes_exams
+       FROM vet_passes
+       WHERE pet_id = ? AND redeemed_by_user_id = ? AND expires_at >= CURRENT_TIMESTAMP`,
       [pet.id, user.id]
     );
-    if (passes.length > 0) return { allowed: true, pet };
+    for (const pass of passes as Array<{ includes_medical_records: boolean; includes_vaccines: boolean; includes_exams: boolean }>) {
+      // Sem categoria = checagem genérica (qualquer passe válido serve).
+      if (!category) return { allowed: true, pet };
+      if (category === 'medical_records' && pass.includes_medical_records) return { allowed: true, pet };
+      if (category === 'vaccines' && pass.includes_vaccines) return { allowed: true, pet };
+      if (category === 'exams' && pass.includes_exams) return { allowed: true, pet };
+    }
   }
 
   return { allowed: false, status: 403, message: 'Forbidden' };
