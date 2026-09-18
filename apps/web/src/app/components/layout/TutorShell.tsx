@@ -70,9 +70,7 @@ export function TutorShell({ active, title, description, actions, children }: Tu
       <header className="sticky top-0 z-40 border-b border-border/70 bg-card/92 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <button type="button" onClick={() => navigate(dashboardPath)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-90">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_16px_32px_-22px_rgba(127,162,106,0.8)]">
-              <PawPrint className="h-6 w-6" />
-            </div>
+            <img src="/icon.png" alt="PetHelp" className="h-11 w-11 object-contain" />
             <div>
               <p className="text-[19px] font-medium leading-none">PetHelp</p>
               <p className="mt-1 text-sm text-muted-foreground">Cuidado veterinário conectado</p>

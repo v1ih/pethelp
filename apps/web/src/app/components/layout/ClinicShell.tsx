@@ -6,7 +6,6 @@ import {
   ClipboardList,
   Home,
   LogOut,
-  PawPrint,
   Settings,
   Stethoscope,
   Users,
@@ -86,9 +85,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
             onClick={() => navigate('/clinic-dashboard')}
             className="flex items-center gap-3 text-left transition-opacity hover:opacity-90"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_16px_32px_-22px_rgba(127,162,106,0.8)]">
-              <PawPrint className="h-6 w-6" />
-            </div>
+            <img src="/icon.png" alt="PetHelp" className="h-11 w-11 object-contain" />
             <div>
               <p className="text-[19px] font-medium leading-none">PetHelp</p>
               <p className="mt-1 text-sm text-muted-foreground">Cuidado veterinário conectado</p>

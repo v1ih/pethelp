@@ -1,5 +1,5 @@
 ﻿import * as React from 'react';
-import { Building2, Heart, PawPrint, Stethoscope } from 'lucide-react';
+import { Building2, Heart, Stethoscope } from 'lucide-react';
 
 export type AuthTab = 'login' | 'register';
 export type AuthRole = 'owner' | 'veterinarian' | 'clinic';
@@ -46,7 +46,7 @@ const AUTH_STYLES = `
     width: 50px;
     height: 50px;
     border-radius: 18px;
-    background: #7fa26a;
+    background: transparent;
     color: #ffffff;
     display: inline-flex;
     align-items: center;
@@ -466,7 +466,7 @@ export function AuthShell({ activeTab, onTabChange, role, onRoleChange, children
           <header className="auth-brand">
             <div className="auth-brand-row">
               <div className="auth-brand-mark">
-                <PawPrint size={28} />
+                <img src="/icon.png" alt="PetHelp" width={50} height={50} style={{ objectFit: 'contain' }} />
               </div>
               <h1 className="auth-brand-title">PetHelp</h1>
             </div>
