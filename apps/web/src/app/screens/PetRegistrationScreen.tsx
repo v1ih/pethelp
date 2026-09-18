@@ -40,9 +40,10 @@ export default function PetRegistrationScreen() {
 
     setName(selectedPet.name);
     setSpecies(selectedPet.species || '');
-    setAge(selectedPet.age || '');
+    // Idade/peso são guardados como "3 anos"/"25 kg"; no formulário editamos só o número.
+    setAge((selectedPet.age || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
     setBreed(selectedPet.breed || '');
-    setWeight(selectedPet.weight || '');
+    setWeight((selectedPet.weight || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
     setPhoto(selectedPet.photo || '');
     setAllergiesStr(selectedPet.allergies ? selectedPet.allergies.join(', ') : '');
     setConditionsStr(selectedPet.conditions ? selectedPet.conditions.join(', ') : '');
@@ -56,9 +57,9 @@ export default function PetRegistrationScreen() {
       const petPayload = {
         name: name.trim(),
         species: species.trim(),
-        age: age.trim() || null,
+        age: age.trim() ? `${age.trim().replace(',', '.')} ${age.trim().replace(',', '.') === '1' ? 'ano' : 'anos'}` : null,
         breed: breed.trim() || null,
-        weight: weight.trim() || null,
+        weight: weight.trim() ? `${weight.trim().replace(',', '.')} kg` : null,
         photo: photo || null,
         allergies: allergiesStr ? allergiesStr.split(',').map((s) => s.trim()).filter(Boolean) : null,
         conditions: conditionsStr ? conditionsStr.split(',').map((s) => s.trim()).filter(Boolean) : null,
@@ -147,8 +148,11 @@ export default function PetRegistrationScreen() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="age" className="mb-2 block text-foreground">Idade</label>
-                <input type="text" id="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="3 anos" />
+                <label htmlFor="age" className="mb-2 block text-foreground">Idade (anos)</label>
+                <div className="relative">
+                  <input type="number" inputMode="decimal" min="0" step="0.5" id="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary" placeholder="3" />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">anos</span>
+                </div>
               </div>
               <div>
                 <label htmlFor="breed" className="mb-2 block text-foreground">Raça</label>
@@ -158,8 +162,11 @@ export default function PetRegistrationScreen() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="weight" className="mb-2 block text-foreground">Peso</label>
-                <input type="text" id="weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="25 kg" />
+                <label htmlFor="weight" className="mb-2 block text-foreground">Peso (kg)</label>
+                <div className="relative">
+                  <input type="number" inputMode="decimal" min="0" step="0.1" id="weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 pr-12 text-foreground outline-none transition-colors focus:border-primary" placeholder="25" />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">kg</span>
+                </div>
               </div>
               <div>
                 <label htmlFor="allergies" className="mb-2 block text-foreground">Alergias</label>
