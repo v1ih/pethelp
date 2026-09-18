@@ -5,6 +5,7 @@ import { getDashboardRouteForUserType, type UserType } from '../context/shared';
 import { useSession } from '../context/SessionContext';
 import { PasswordInput } from '../components/ui/password-input';
 import { AuthShell } from '../components/layout/AuthShell';
+import { maskCNPJ, maskPhone } from '../utils/masks';
 
 export default function RegisterScreen() {
   const navigate = useNavigate();
@@ -127,7 +128,8 @@ export default function RegisterScreen() {
                 type="tel"
                 id="phone"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(maskPhone(e.target.value))}
+                inputMode="numeric"
                 className="auth-input"
                 placeholder="(11) 99999-9999"
                 required
@@ -197,7 +199,8 @@ export default function RegisterScreen() {
                 type="text"
                 id="cnpj"
                 value={cnpj}
-                onChange={(e) => setCnpj(e.target.value)}
+                onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
+                inputMode="numeric"
                 className="auth-input auth-input-no-icon"
                 placeholder="00.000.000/0000-00"
               />

@@ -121,6 +121,9 @@ export interface VetPassRecord {
   createdAt: string;
   expiresAt: string;
   redeemedAt?: string | null;
+  includesMedicalRecords?: boolean;
+  includesVaccines?: boolean;
+  includesExams?: boolean;
 }
 
 export interface User {

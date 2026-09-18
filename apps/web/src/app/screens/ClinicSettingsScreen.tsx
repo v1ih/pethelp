@@ -12,6 +12,7 @@ import {
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { useSession } from '../context/SessionContext';
 import { useAppNavigation, useDashboardBackLogout } from '../navigation';
+import { maskCNPJ, maskPhone } from '../utils/masks';
 
 const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -150,14 +151,14 @@ export default function ClinicSettingsScreen() {
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">CNPJ</label>
-                <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={cnpj} onChange={(e) => setCnpj(maskCNPJ(e.target.value))} inputMode="numeric" placeholder="00.000.000/0000-00" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-foreground">Telefone</label>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
+                <input value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} inputMode="numeric" placeholder="(11) 99999-9999" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
               <div>
                 <label className="mb-2 block text-sm text-foreground">Endereço</label>

@@ -37,7 +37,19 @@ function toUiVetPass(item: any): VetPassRecord {
     createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
     expiresAt: item.expiresAt ?? item.expires_at ?? new Date().toISOString(),
     redeemedAt: item.redeemedAt ?? item.redeemed_at ?? undefined,
+    includesMedicalRecords: item.includesMedicalRecords ?? item.includes_medical_records,
+    includesVaccines: item.includesVaccines ?? item.includes_vaccines,
+    includesExams: item.includesExams ?? item.includes_exams,
   };
+}
+
+/** Rótulos do que um Vet-Pass libera, para exibir ao veterinário. */
+function passScopeLabels(pass: VetPassRecord): string[] {
+  const labels: string[] = [];
+  if (pass.includesMedicalRecords !== false) labels.push('Prontuário');
+  if (pass.includesVaccines !== false) labels.push('Vacinas');
+  if (pass.includesExams !== false) labels.push('Exames');
+  return labels;
 }
 
 export default function ExamsScreen() {
@@ -303,6 +315,14 @@ export default function ExamsScreen() {
             <div className="rounded-[28px] border border-border bg-muted/20 p-4">
               <p className="text-foreground">{redeemedPass.petName}</p>
               <p className="text-sm text-muted-foreground">{redeemedPass.documents.length} anexos liberados</p>
+              <div className="mt-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">O responsável liberou</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {passScopeLabels(redeemedPass).map((label) => (
+                    <span key={label} className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary">{label}</span>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
         )}
