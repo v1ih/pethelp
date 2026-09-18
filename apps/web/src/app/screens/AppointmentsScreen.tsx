@@ -61,6 +61,56 @@ const initialAvailability: AvailabilityState = {
   busyTimes: [],
 };
 
+// Chaves como o backend guarda o expediente da clínica (getDay(): 0=Dom ... 6=Sáb).
+const WEEKDAY_KEYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function weekdayKeyFromDate(dateStr: string) {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? '' : WEEKDAY_KEYS[d.getDay()];
+}
+
+/** Gera horários (padrão de 30 em 30 min) entre abertura e fechamento. */
+function generateSlots(open: string, close: string, stepMin = 30): string[] {
+  const [oh, om] = open.split(':').map(Number);
+  const [ch, cm] = close.split(':').map(Number);
+  if ([oh, om, ch, cm].some((n) => Number.isNaN(n))) return [];
+  const slots: string[] = [];
+  for (let cur = oh * 60 + om, end = ch * 60 + cm; cur < end; cur += stepMin) {
+    slots.push(`${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`);
+  }
+  return slots;
+}
+
+/** Calcula os horários realmente livres para o dia (respeita expediente, ocupados e horário passado). */
+function computeAvailableSlots(dateStr: string, workingHours: Record<string, unknown> | null | undefined, busyTimes: string[]): string[] {
+  const weekday = weekdayKeyFromDate(dateStr);
+  let open = '08:00';
+  let close = '18:00';
+  const wh = workingHours && weekday ? (workingHours as Record<string, { open?: string; close?: string } | undefined>)[weekday] : undefined;
+  if (workingHours) {
+    // Clínica com expediente configurado: respeita o dia (fechado -> sem horários).
+    if (wh?.open && wh?.close) {
+      open = wh.open.slice(0, 5);
+      close = wh.close.slice(0, 5);
+    } else {
+      return [];
+    }
+  }
+  // Sem expediente configurado (workingHours null): usa a janela padrão 08:00-18:00.
+  const busy = new Set(busyTimes.map((t) => (typeof t === 'string' ? t.slice(0, 5) : '')));
+  let slots = generateSlots(open, close).filter((s) => !busy.has(s));
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (dateStr === todayStr) {
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    slots = slots.filter((s) => {
+      const [h, m] = s.split(':').map(Number);
+      return h * 60 + m > nowMin;
+    });
+  }
+  return slots;
+}
+
 function mapCatalogEntry(entry: any, type: 'clinic' | 'veterinarian'): CatalogEntry {
   return {
     id: String(entry.id),
@@ -125,6 +175,7 @@ export default function AppointmentsScreen() {
   const [loadingClinics, setLoadingClinics] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [availability, setAvailability] = useState<AvailabilityState>(initialAvailability);
+  const [slotState, setSlotState] = useState<{ loading: boolean; slots: string[]; note: string }>({ loading: false, slots: [], note: '' });
   const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -329,6 +380,52 @@ export default function AppointmentsScreen() {
 
     return () => controller.abort();
   }, [API_BASE, date, selectedCatalogId, selectedClinicId, showNewAppointment, targetType, time]);
+
+  // Carrega os HORÁRIOS DISPONÍVEIS do dia (expediente − ocupados − passados),
+  // para o usuário escolher entre opções reais em vez de digitar um horário livre.
+  useEffect(() => {
+    const needsClinic = targetType === 'clinic';
+    const hasClinic = Boolean(selectedClinicId);
+    const hasVeterinarian = Boolean(selectedCatalogId);
+
+    if (!showNewAppointment || !date || !hasVeterinarian || (needsClinic && !hasClinic)) {
+      setSlotState({ loading: false, slots: [], note: '' });
+      return;
+    }
+
+    const controller = new AbortController();
+    (async () => {
+      setSlotState({ loading: true, slots: [], note: '' });
+      try {
+        const params = new URLSearchParams({ date, time: '08:00' });
+        if (hasClinic) params.set('clinicId', selectedClinicId);
+        if (hasVeterinarian) params.set('veterinarianId', selectedCatalogId);
+
+        const resp = await fetch(`${API_BASE}/api/appointments/availability?${params.toString()}`, {
+          headers: getAuthHeaders(),
+          signal: controller.signal,
+        });
+        const payload = await resp.json().catch(() => null);
+        const busyTimes: string[] = Array.isArray(payload?.data?.busyTimes) ? payload.data.busyTimes : [];
+        const workingHours = payload?.data?.workingHours ?? null;
+        const slots = computeAvailableSlots(date, workingHours, busyTimes);
+
+        setSlotState({
+          loading: false,
+          slots,
+          note: slots.length === 0 ? 'Sem horários disponíveis neste dia. Tente outra data.' : '',
+        });
+        // Se o horário escolhido não existe mais entre os livres, limpa a seleção.
+        setTime((current) => (current && !slots.includes(current) ? '' : current));
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          setSlotState({ loading: false, slots: [], note: 'Não foi possível carregar os horários.' });
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [API_BASE, date, selectedCatalogId, selectedClinicId, showNewAppointment, targetType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -597,8 +694,28 @@ export default function AppointmentsScreen() {
                   <label className="mb-2 block text-foreground">Horário</label>
                   <div className="relative">
                     <Clock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary" required />
+                    <select
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      disabled={slotState.loading || (!date) || slotState.slots.length === 0}
+                      className="w-full appearance-none rounded-[18px] border border-border bg-input-background py-3 pl-12 pr-4 text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                      required
+                    >
+                      <option value="">
+                        {!date
+                          ? 'Escolha a data primeiro'
+                          : slotState.loading
+                            ? 'Carregando horários...'
+                            : slotState.slots.length === 0
+                              ? 'Sem horários disponíveis'
+                              : 'Selecione um horário'}
+                      </option>
+                      {slotState.slots.map((slot) => (
+                        <option key={slot} value={slot}>{slot}</option>
+                      ))}
+                    </select>
                   </div>
+                  {slotState.note ? <p className="mt-1 text-xs text-amber-600">{slotState.note}</p> : null}
                 </div>
               </div>
 
