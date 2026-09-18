@@ -190,6 +190,56 @@ async function loadClinicWorkingHours(db: DbClient, clinicId: string) {
   }
 }
 
+type WorkingHours = Record<string, { open?: string; close?: string } | undefined>;
+const WEEKDAY_LIST = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function parseWorkingHoursValue(raw: unknown): WorkingHours | null {
+  if (!raw) return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as WorkingHours;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as WorkingHours) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function loadVetWorkingHours(db: DbClient, veterinarianId: string) {
+  const [rows] = await db.query<RowDataPacket[]>('SELECT working_hours FROM veterinarians WHERE id = ? LIMIT 1', [veterinarianId]);
+  return parseWorkingHoursValue((rows[0] as { working_hours?: string | null } | undefined)?.working_hours);
+}
+
+function toMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+function fromMinutes(min: number) {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+/** Combina expediente da clínica e do veterinário: interseção por dia. */
+function effectiveWorkingHours(clinic: WorkingHours | null, vet: WorkingHours | null): WorkingHours | null {
+  if (!clinic && !vet) return null;
+  if (!vet) return clinic;
+  if (!clinic) return vet;
+  const out: WorkingHours = {};
+  for (const d of WEEKDAY_LIST) {
+    const c = clinic[d];
+    const v = vet[d];
+    if (c?.open && c?.close && v?.open && v?.close) {
+      const open = Math.max(toMinutes(c.open), toMinutes(v.open));
+      const close = Math.min(toMinutes(c.close), toMinutes(v.close));
+      out[d] = close > open ? { open: fromMinutes(open), close: fromMinutes(close) } : { open: '', close: '' };
+    } else {
+      out[d] = { open: '', close: '' }; // um dos dois está fechado nesse dia
+    }
+  }
+  return out;
+}
+
 async function isVeterinarianLinkedToClinic(db: DbClient, clinicId: string, veterinarianId: string) {
   const [rows] = await db.query<RowDataPacket[]>(
     `
@@ -217,19 +267,18 @@ async function resolveAvailability(
 ) {
   const issues: string[] = [];
   const weekday = getWeekdayKey(input.date);
-  let workingHours: Record<string, { open?: string; close?: string } | undefined> | null = null;
 
-  if (input.clinicId) {
-    workingHours = await loadClinicWorkingHours(db, input.clinicId);
-    if (!workingHours) {
-      issues.push('A clínica selecionada não possui horário de funcionamento configurado.');
-    } else if (weekday) {
-      const hours = workingHours[weekday];
-      if (!hours?.open || !hours?.close) {
-        issues.push('A clínica selecionada não atende neste dia.');
-      } else if (!isWithinRange(input.time, hours.open, hours.close)) {
-        issues.push('O horário escolhido está fora do funcionamento da clínica.');
-      }
+  const clinicHours = input.clinicId ? await loadClinicWorkingHours(db, input.clinicId) : null;
+  const vetHours = input.veterinarianId ? await loadVetWorkingHours(db, input.veterinarianId) : null;
+  // Expediente efetivo = interseção clínica ∩ veterinário (o que existir).
+  const workingHours = effectiveWorkingHours(clinicHours, vetHours);
+
+  if (workingHours && weekday) {
+    const hours = workingHours[weekday];
+    if (!hours?.open || !hours?.close) {
+      issues.push('Não há expediente neste dia para o profissional selecionado.');
+    } else if (!isWithinRange(input.time, hours.open, hours.close)) {
+      issues.push('O horário escolhido está fora do expediente.');
     }
   }
 

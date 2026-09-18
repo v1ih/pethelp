@@ -1,10 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3, Edit3, Plus, ShieldAlert, Stethoscope, Trash2 } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Clock3, LayoutList, Save, Stethoscope } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { useSession } from '../context/SessionContext';
+import { useInteraction } from '../context/InteractionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { useDashboardBackLogout } from '../navigation';
+import MonthCalendar from '../components/calendar/MonthCalendar';
+
+const STATUS_LABEL: Record<string, string> = { scheduled: 'Agendada', completed: 'Concluída', cancelled: 'Cancelada' };
+function formatDayLabelPt(dateStr: string) {
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  } catch {
+    return dateStr;
+  }
+}
+
+type DayHours = { open: string; close: string };
+type WorkingHours = Record<string, DayHours>;
 
 type ClinicLink = {
   id: string;
@@ -17,28 +31,39 @@ type ClinicLink = {
   veterinarianEmail: string;
   veterinarianCrmv: string;
   veterinarianCrmvUf: string;
+  veterinarianWorkingHours?: WorkingHours | null;
 };
 
-type AvailabilitySlot = {
-  id: string;
-  day: string;
-  start: string;
-  end: string;
-};
+const WEEKDAYS: Array<{ key: string; label: string }> = [
+  { key: 'Seg', label: 'Segunda' },
+  { key: 'Ter', label: 'Terça' },
+  { key: 'Qua', label: 'Quarta' },
+  { key: 'Qui', label: 'Quinta' },
+  { key: 'Sex', label: 'Sexta' },
+  { key: 'Sáb', label: 'Sábado' },
+  { key: 'Dom', label: 'Domingo' },
+];
 
-type VetSchedule = {
-  specialty: string;
-  slots: AvailabilitySlot[];
-};
-
-const days = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
-
-function createSlotId() {
-  return Math.random().toString(36).slice(2, 10);
+function defaultHours(): WorkingHours {
+  return {
+    Seg: { open: '08:00', close: '18:00' },
+    Ter: { open: '08:00', close: '18:00' },
+    Qua: { open: '08:00', close: '18:00' },
+    Qui: { open: '08:00', close: '18:00' },
+    Sex: { open: '08:00', close: '18:00' },
+    Sáb: { open: '', close: '' },
+    Dom: { open: '', close: '' },
+  };
 }
 
-function formatDayLabel(day: string) {
-  return day.slice(0, 3);
+function normalizeHours(value: WorkingHours | null | undefined): WorkingHours {
+  if (!value || typeof value !== 'object') return defaultHours();
+  const out: WorkingHours = {};
+  for (const { key } of WEEKDAYS) {
+    const d = value[key];
+    out[key] = { open: d?.open ?? '', close: d?.close ?? '' };
+  }
+  return out;
 }
 
 export default function ClinicAgendaScreen() {
@@ -46,71 +71,46 @@ export default function ClinicAgendaScreen() {
   const { user } = useSession();
   useDashboardBackLogout();
 
+  const { appointments } = useInteraction();
+  const [view, setView] = useState<'calendar' | 'hours'>('calendar');
+  const [selectedDay, setSelectedDay] = useState('');
   const [links, setLinks] = useState<ClinicLink[]>([]);
-  const [scheduleMap, setScheduleMap] = useState<Record<string, VetSchedule>>({});
   const [selectedVetId, setSelectedVetId] = useState('');
-  const [draftSpecialty, setDraftSpecialty] = useState('');
-  const [draftDay, setDraftDay] = useState(days[0]);
-  const [draftStart, setDraftStart] = useState('08:00');
-  const [draftEnd, setDraftEnd] = useState('12:00');
-  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+  const [hours, setHours] = useState<WorkingHours>(defaultHours());
+  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const API_BASE = getApiBase();
-  const storageKey = user?.id ? `clinic-vet-schedules:${user.id}` : null;
+
+  const dayAppointments = useMemo(
+    () => appointments.filter((a) => a.date === selectedDay).sort((x, y) => (x.time ?? '').localeCompare(y.time ?? '')),
+    [appointments, selectedDay]
+  );
 
   useEffect(() => {
     let cancelled = false;
-
     const loadLinks = async () => {
-      const resp = await fetch(`${API_BASE}/api/clinic-links/me`, {
-        headers: getAuthHeaders(),
-      });
-
+      const resp = await fetch(`${API_BASE}/api/clinic-links/me`, { headers: getAuthHeaders() });
       if (!resp.ok) {
         if (!cancelled) setLinks([]);
         return;
       }
-
       const { data } = await resp.json();
-      if (!cancelled) {
-        setLinks((data ?? []) as ClinicLink[]);
-      }
+      if (!cancelled) setLinks((data ?? []) as ClinicLink[]);
     };
-
     void loadLinks();
-
     return () => {
       cancelled = true;
     };
   }, [API_BASE]);
 
-  useEffect(() => {
-    if (!storageKey) return;
-
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return;
-      setScheduleMap(JSON.parse(raw) as Record<string, VetSchedule>);
-    } catch (error) {
-      console.error('Falha ao carregar agendas da clínica:', error);
-    }
-  }, [storageKey]);
-
-  useEffect(() => {
-    if (!storageKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(scheduleMap));
-  }, [scheduleMap, storageKey]);
-
   const approvedLinks = useMemo(() => links.filter((link) => link.status === 'approved'), [links]);
   const selectedVet = approvedLinks.find((link) => link.veterinarianId === selectedVetId) ?? null;
-  const currentSchedule = selectedVet ? scheduleMap[selectedVet.veterinarianId] ?? { specialty: '', slots: [] } : { specialty: '', slots: [] };
 
   useEffect(() => {
     if (approvedLinks.length === 0) {
       setSelectedVetId('');
       return;
     }
-
     if (!selectedVetId || !approvedLinks.some((link) => link.veterinarianId === selectedVetId)) {
       setSelectedVetId(approvedLinks[0].veterinarianId);
     }
@@ -118,88 +118,53 @@ export default function ClinicAgendaScreen() {
 
   useEffect(() => {
     if (!selectedVet) return;
+    setHours(normalizeHours(selectedVet.veterinarianWorkingHours));
+    setFeedback(null);
+  }, [selectedVet]);
 
-    const schedule = scheduleMap[selectedVet.veterinarianId];
-    setDraftSpecialty(schedule?.specialty ?? '');
-  }, [selectedVet, scheduleMap]);
+  const setDay = (key: string, field: 'open' | 'close', value: string) => {
+    setHours((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  };
+
+  const toggleClosed = (key: string, closed: boolean) => {
+    setHours((prev) => ({ ...prev, [key]: closed ? { open: '', close: '' } : { open: '08:00', close: '18:00' } }));
+  };
+
+  const handleSave = async () => {
+    if (!selectedVet) return;
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const resp = await fetch(`${API_BASE}/api/clinic-links/veterinarians/${selectedVet.veterinarianId}/working-hours`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ workingHours: hours }),
+      });
+      if (!resp.ok) {
+        const payload = await resp.json().catch(() => null);
+        throw new Error(payload?.message ?? 'Falha ao salvar');
+      }
+      // Atualiza a lista local para refletir o horário salvo.
+      setLinks((prev) => prev.map((link) => (link.veterinarianId === selectedVet.veterinarianId ? { ...link, veterinarianWorkingHours: hours } : link)));
+      setFeedback({ type: 'success', message: 'Horário de atendimento salvo com sucesso.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Não foi possível salvar.' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const selectedVetLabel = selectedVet
     ? `${selectedVet.veterinarianName} • CRMV ${selectedVet.veterinarianCrmv}/${selectedVet.veterinarianCrmvUf}`
     : 'Selecione um veterinário';
 
-  const persistSchedule = (vetId: string, nextSchedule: VetSchedule) => {
-    setScheduleMap((prev) => ({
-      ...prev,
-      [vetId]: nextSchedule,
-    }));
-  };
-
-  const handleSaveSpecialty = () => {
-    if (!selectedVet) return;
-
-    persistSchedule(selectedVet.veterinarianId, {
-      ...currentSchedule,
-      specialty: draftSpecialty.trim(),
-    });
-
-    setFeedback({ type: 'success', message: 'Especialidade salva com sucesso.' });
-  };
-
-  const handleAddOrUpdateSlot = () => {
-    if (!selectedVet) return;
-    if (!draftDay || !draftStart || !draftEnd) return;
-
-    const nextSlot: AvailabilitySlot = {
-      id: editingSlotId ?? createSlotId(),
-      day: draftDay,
-      start: draftStart,
-      end: draftEnd,
-    };
-
-    const existingSlots = currentSchedule.slots ?? [];
-    const nextSlots = editingSlotId ? existingSlots.map((slot) => (slot.id === editingSlotId ? nextSlot : slot)) : [...existingSlots, nextSlot];
-
-    persistSchedule(selectedVet.veterinarianId, {
-      specialty: draftSpecialty.trim(),
-      slots: nextSlots,
-    });
-
-    setEditingSlotId(null);
-    setDraftDay(days[0]);
-    setDraftStart('08:00');
-    setDraftEnd('12:00');
-    setFeedback({
-      type: 'success',
-      message: editingSlotId ? 'Horário atualizado com sucesso.' : 'Horário criado com sucesso.',
-    });
-  };
-
-  const handleEditSlot = (slot: AvailabilitySlot) => {
-    setEditingSlotId(slot.id);
-    setDraftDay(slot.day);
-    setDraftStart(slot.start);
-    setDraftEnd(slot.end);
-  };
-
-  const handleDeleteSlot = (slotId: string) => {
-    if (!selectedVet) return;
-
-    persistSchedule(selectedVet.veterinarianId, {
-      specialty: draftSpecialty.trim(),
-      slots: currentSchedule.slots.filter((slot) => slot.id !== slotId),
-    });
-
-    if (editingSlotId === slotId) {
-      setEditingSlotId(null);
-    }
-    setFeedback({ type: 'success', message: 'Horário removido.' });
-  };
+  const openDays = WEEKDAYS.filter(({ key }) => hours[key]?.open && hours[key]?.close).length;
 
   return (
     <ClinicShell
       active="agenda"
       title="Agenda da clínica"
-      description="Organize horários por veterinário e mantenha a agenda operacional centralizada."
+      description="Defina o horário de atendimento de cada veterinário. Esses horários controlam os agendamentos disponíveis."
       actions={
         <button
           type="button"
@@ -213,37 +178,57 @@ export default function ClinicAgendaScreen() {
     >
       <div className="space-y-6">
         {feedback ? (
-          <div
-            className={`rounded-2xl border px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
+          <div className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
             {feedback.message}
           </div>
         ) : null}
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-            <p className="text-sm text-muted-foreground">Ativos</p>
-            <p className="mt-2 text-3xl font-medium text-foreground">{approvedLinks.length}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Veterinários com vínculo aprovado.</p>
-          </div>
-          <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-            <p className="text-sm text-muted-foreground">Horários</p>
-            <p className="mt-2 text-3xl font-medium text-foreground">
-              {selectedVet ? currentSchedule.slots.length : 0}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">Intervalos cadastrados para o profissional selecionado.</p>
-          </div>
-          <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-            <p className="text-sm text-muted-foreground">Seleção</p>
-            <p className="mt-2 text-3xl font-medium text-foreground">{selectedVet ? '1' : '0'}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Veterinário ativo em edição.</p>
-          </div>
-        </section>
+        <div className="flex w-max items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setView('calendar')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${view === 'calendar' ? 'bg-primary text-white' : 'text-foreground hover:bg-muted'}`}
+          >
+            <CalendarDays className="h-4 w-4" /> Calendário
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('hours')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${view === 'hours' ? 'bg-primary text-white' : 'text-foreground hover:bg-muted'}`}
+          >
+            <Clock3 className="h-4 w-4" /> Horários de atendimento
+          </button>
+        </div>
 
+        {view === 'calendar' ? (
+          <section className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+            <MonthCalendar appointments={appointments} selectedDate={selectedDay} onSelectDate={setSelectedDay} />
+            <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+              <div className="flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-medium text-foreground">{selectedDay ? formatDayLabelPt(selectedDay) : 'Selecione um dia'}</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {!selectedDay ? (
+                  <p className="text-sm text-muted-foreground">Clique em um dia no calendário para ver as consultas.</p>
+                ) : dayAppointments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma consulta neste dia.</p>
+                ) : (
+                  dayAppointments.map((a) => (
+                    <div key={a.id} className="rounded-[18px] border border-border bg-muted/20 px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-foreground">{a.petName}</p>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary">{STATUS_LABEL[a.status] ?? a.status}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{a.time?.slice(0, 5)} • {a.veterinarianName || 'Veterinário'}</p>
+                      <p className="text-sm text-muted-foreground">{a.reason}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+        ) : (
         <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
             <div className="flex items-start justify-between gap-3">
@@ -262,15 +247,12 @@ export default function ClinicAgendaScreen() {
               ) : (
                 approvedLinks.map((link) => {
                   const isSelected = selectedVetId === link.veterinarianId;
-
                   return (
                     <button
                       key={link.id}
                       type="button"
                       onClick={() => setSelectedVetId(link.veterinarianId)}
-                      className={`w-full rounded-[22px] border px-4 py-4 text-left transition-colors ${
-                        isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background hover:bg-muted/60'
-                      }`}
+                      className={`w-full rounded-[22px] border px-4 py-4 text-left transition-colors ${isSelected ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background hover:bg-muted/60'}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -292,162 +274,66 @@ export default function ClinicAgendaScreen() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Agenda por profissional</p>
-                  <h2 className="text-2xl font-medium text-foreground">{selectedVetLabel}</h2>
-                </div>
-                <Clock3 className="h-6 w-6 text-primary" />
+          <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Horário de atendimento</p>
+                <h2 className="text-2xl font-medium text-foreground">{selectedVetLabel}</h2>
               </div>
+              <Clock3 className="h-6 w-6 text-primary" />
+            </div>
 
-              {selectedVet ? (
-                <div className="mt-6 space-y-4">
-                  <div className="rounded-[22px] border border-border bg-muted/20 p-4">
-                    <div className="flex items-center gap-3">
-                      <ShieldAlert className="h-5 w-5 text-primary" />
-                      <h3 className="text-lg text-foreground">Especialidade</h3>
-                    </div>
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                      <input
-                        value={draftSpecialty}
-                        onChange={(event) => setDraftSpecialty(event.target.value)}
-                        placeholder="Ex.: Dermatologia, Cardiologia, Clínica geral"
-                        className="flex-1 rounded-[18px] border border-border bg-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleSaveSpecialty}
-                        className="inline-flex items-center justify-center gap-2 rounded-[18px] border border-border bg-background px-4 py-3 text-foreground transition-colors hover:bg-muted"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Salvar especialidade
-                      </button>
-                    </div>
-                  </div>
+            {selectedVet ? (
+              <div className="mt-6 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {openDays} dia{openDays === 1 ? '' : 's'} de atendimento na semana.
+                </p>
 
-                  <div className="rounded-[22px] border border-border bg-muted/20 p-4">
-                    <div className="flex items-center gap-3">
-                      <CalendarDays className="h-5 w-5 text-primary" />
-                      <h3 className="text-lg text-foreground">Cadastrar horários disponíveis</h3>
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-4">
-                      <select
-                        value={draftDay}
-                        onChange={(event) => setDraftDay(event.target.value)}
-                        className="rounded-[18px] border border-border bg-background px-4 py-3 text-foreground outline-none"
-                      >
-                        {days.map((day) => (
-                          <option key={day} value={day}>
-                            {day}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="time"
-                        value={draftStart}
-                        onChange={(event) => setDraftStart(event.target.value)}
-                        className="rounded-[18px] border border-border bg-background px-4 py-3 text-foreground outline-none"
-                      />
-                      <input
-                        type="time"
-                        value={draftEnd}
-                        onChange={(event) => setDraftEnd(event.target.value)}
-                        className="rounded-[18px] border border-border bg-background px-4 py-3 text-foreground outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddOrUpdateSlot}
-                        className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90"
-                      >
-                        <Plus className="h-4 w-4" />
-                        {editingSlotId ? 'Atualizar horário' : 'Adicionar horário'}
-                      </button>
-                    </div>
-
-                    {editingSlotId ? (
-                      <p className="mt-3 text-xs text-muted-foreground">Você está editando um horário existente. Salve para substituir o período atual.</p>
-                    ) : null}
-                  </div>
-
-                  <div className="rounded-[22px] border border-border bg-background p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg text-foreground">Horários cadastrados</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {currentSchedule.slots.length} intervalo{currentSchedule.slots.length === 1 ? '' : 's'} disponíve{currentSchedule.slots.length === 1 ? 'l' : 'is'}
-                        </p>
-                      </div>
-                      <Clock3 className="h-5 w-5 text-primary" />
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {currentSchedule.slots.length === 0 ? (
-                        <div className="rounded-[18px] border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                          Nenhum horário cadastrado para este veterinário.
+                {WEEKDAYS.map(({ key, label }) => {
+                  const day = hours[key] ?? { open: '', close: '' };
+                  const closed = !day.open || !day.close;
+                  return (
+                    <div key={key} className="flex flex-wrap items-center gap-3 rounded-[18px] border border-border bg-muted/20 px-4 py-3">
+                      <span className="w-24 text-sm font-medium text-foreground">{label}</span>
+                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <input type="checkbox" checked={!closed} onChange={(e) => toggleClosed(key, !e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
+                        Atende
+                      </label>
+                      {!closed ? (
+                        <div className="flex items-center gap-2">
+                          <input type="time" value={day.open} onChange={(e) => setDay(key, 'open', e.target.value)} className="rounded-[14px] border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
+                          <span className="text-muted-foreground">às</span>
+                          <input type="time" value={day.close} onChange={(e) => setDay(key, 'close', e.target.value)} className="rounded-[14px] border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary" />
                         </div>
                       ) : (
-                        currentSchedule.slots.map((slot) => (
-                          <div key={slot.id} className="flex items-center justify-between gap-3 rounded-[18px] border border-border bg-muted/20 px-4 py-3">
-                            <div>
-                              <p className="text-foreground">{formatDayLabel(slot.day)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {slot.start} - {slot.end}
-                              </p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEditSlot(slot)}
-                                className="inline-flex items-center gap-2 rounded-[18px] border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                              >
-                                <Edit3 className="h-4 w-4" />
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSlot(slot.id)}
-                                className="inline-flex items-center gap-2 rounded-[18px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 transition-colors hover:bg-red-100"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                Excluir
-                              </button>
-                            </div>
-                          </div>
-                        ))
+                        <span className="text-sm text-muted-foreground">Fechado</span>
                       )}
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-6 rounded-[22px] border border-dashed border-border bg-muted/20 p-6">
-                  <p className="text-sm text-muted-foreground">
-                    Selecione um veterinário ativo para definir especialidade e horários.
-                  </p>
-                </div>
-              )}
-            </div>
+                  );
+                })}
 
-            <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Fluxo</p>
-                  <h3 className="text-2xl font-medium text-foreground">Ir para os vínculos</h3>
-                </div>
-                <ArrowRight className="h-6 w-6 text-primary" />
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="mt-2 inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Salvando...' : 'Salvar horário'}
+                </button>
+
+                <p className="text-xs text-muted-foreground">
+                  Dica: o horário disponível para agendamento é a combinação do expediente da clínica com o do veterinário.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/clinic-veterinarians')}
-                className="mt-5 inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"
-              >
-                <Stethoscope className="h-4 w-4" />
-                Abrir tela de veterinários
-              </button>
-            </div>
+            ) : (
+              <div className="mt-6 rounded-[22px] border border-dashed border-border bg-muted/20 p-6">
+                <p className="text-sm text-muted-foreground">Selecione um veterinário ativo para definir o horário de atendimento.</p>
+              </div>
+            )}
           </div>
         </section>
+        )}
       </div>
     </ClinicShell>
   );

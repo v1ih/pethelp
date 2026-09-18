@@ -56,6 +56,7 @@ async function loadClinicVeterinarianRows(whereClause: string, values: Array<str
         veterinarian_email: string;
         veterinarian_crmv: string;
         veterinarian_crmv_uf: string;
+        veterinarian_working_hours: string | null;
       }
     >
   >(
@@ -66,7 +67,8 @@ async function loadClinicVeterinarianRows(whereClause: string, values: Array<str
         v.name AS veterinarian_name,
         u.email AS veterinarian_email,
         v.crmv AS veterinarian_crmv,
-        v.crmv_uf AS veterinarian_crmv_uf
+        v.crmv_uf AS veterinarian_crmv_uf,
+        v.working_hours AS veterinarian_working_hours
       FROM clinic_veterinarians cv
       INNER JOIN clinics c ON c.id = cv.clinic_id
       INNER JOIN veterinarians v ON v.id = cv.veterinarian_id
@@ -78,6 +80,16 @@ async function loadClinicVeterinarianRows(whereClause: string, values: Array<str
   );
 
   return rows;
+}
+
+function parseWorkingHours(value: string | null): unknown {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 router.get('/me', async (req: AuthRequest, res, next) => {
@@ -102,6 +114,7 @@ router.get('/me', async (req: AuthRequest, res, next) => {
           veterinarianEmail: row.veterinarian_email,
           veterinarianCrmv: row.veterinarian_crmv,
           veterinarianCrmvUf: row.veterinarian_crmv_uf,
+          veterinarianWorkingHours: parseWorkingHours(row.veterinarian_working_hours),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         })),
@@ -129,6 +142,7 @@ router.get('/me', async (req: AuthRequest, res, next) => {
           veterinarianEmail: row.veterinarian_email,
           veterinarianCrmv: row.veterinarian_crmv,
           veterinarianCrmvUf: row.veterinarian_crmv_uf,
+          veterinarianWorkingHours: parseWorkingHours(row.veterinarian_working_hours),
           createdAt: row.created_at,
           updatedAt: row.updated_at,
         })),
@@ -397,6 +411,38 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
 
     await pool.execute('DELETE FROM clinic_veterinarians WHERE id = ?', [linkId]);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Clínica define o horário de atendimento de um veterinário vinculado (aprovado).
+router.patch('/veterinarians/:veterinarianId/working-hours', async (req: AuthRequest, res, next) => {
+  try {
+    if (req.user?.userType !== 'clinic') {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+    const clinicId = await getCurrentClinicId(req.user);
+    if (!clinicId) {
+      res.status(404).json({ message: 'Clinic profile not found' });
+      return;
+    }
+    const veterinarianId = String(req.params.veterinarianId);
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT id FROM clinic_veterinarians WHERE clinic_id = ? AND veterinarian_id = ? AND status = 'approved' LIMIT 1",
+      [clinicId, veterinarianId]
+    );
+    if (rows.length === 0) {
+      res.status(403).json({ message: 'Veterinário não vinculado a esta clínica.' });
+      return;
+    }
+    const workingHours = req.body?.workingHours ?? null;
+    await pool.execute(
+      'UPDATE veterinarians SET working_hours = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [workingHours ? JSON.stringify(workingHours) : null, veterinarianId]
+    );
+    res.json({ ok: true, workingHours });
   } catch (error) {
     next(error);
   }

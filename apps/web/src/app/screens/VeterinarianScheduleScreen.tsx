@@ -1,10 +1,21 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, CalendarDays, Clock3, Edit3, Link2, Plus, ShieldAlert, Stethoscope, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock3, Edit3, LayoutList, Link2, Plus, ShieldAlert, Stethoscope, Trash2, X } from 'lucide-react';
 import { useSession } from '../context/SessionContext';
+import { useInteraction } from '../context/InteractionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { useAppNavigation, useDashboardBackLogout } from '../navigation';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
+import MonthCalendar from '../components/calendar/MonthCalendar';
+
+const VET_STATUS_LABEL: Record<string, string> = { scheduled: 'Agendada', completed: 'Concluída', cancelled: 'Cancelada' };
+function vetFormatDayLabel(dateStr: string) {
+  try {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  } catch {
+    return dateStr;
+  }
+}
 
 type ScheduleStatus = 'available' | 'blocked';
 
@@ -94,6 +105,13 @@ function formatWorkingHours(hours?: Record<string, { open?: string; close?: stri
 export default function VeterinarianScheduleScreen() {
   const navigate = useNavigate();
   const { user } = useSession();
+  const { appointments } = useInteraction();
+  const [scheduleTab, setScheduleTab] = useState<'calendar' | 'manage'>('calendar');
+  const [selectedDay, setSelectedDay] = useState('');
+  const dayAppointments = useMemo(
+    () => appointments.filter((a) => a.date === selectedDay).sort((x, y) => (x.time ?? '').localeCompare(y.time ?? '')),
+    [appointments, selectedDay]
+  );
   const { goToDashboard, confirmAndLogout } = useAppNavigation();
   useDashboardBackLogout();
 
@@ -299,6 +317,53 @@ export default function VeterinarianScheduleScreen() {
   return (
             <VeterinarianShell active="agenda" title="Agenda" description="Gerencie horários autônomos e vínculos com clínicas." actions={<button type="button" className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"><Plus className="h-4 w-4" />Novo horário</button>}>
 
+        <div className="mt-6 flex w-max items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setScheduleTab('calendar')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${scheduleTab === 'calendar' ? 'bg-primary text-white' : 'text-foreground hover:bg-muted'}`}
+          >
+            <CalendarDays className="h-4 w-4" /> Calendário
+          </button>
+          <button
+            type="button"
+            onClick={() => setScheduleTab('manage')}
+            className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition-colors ${scheduleTab === 'manage' ? 'bg-primary text-white' : 'text-foreground hover:bg-muted'}`}
+          >
+            <Clock3 className="h-4 w-4" /> Meus horários
+          </button>
+        </div>
+
+        {scheduleTab === 'calendar' ? (
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+            <MonthCalendar appointments={appointments} selectedDate={selectedDay} onSelectDate={setSelectedDay} />
+            <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+              <div className="flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-medium text-foreground">{selectedDay ? vetFormatDayLabel(selectedDay) : 'Selecione um dia'}</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {!selectedDay ? (
+                  <p className="text-sm text-muted-foreground">Clique em um dia no calendário para ver as consultas.</p>
+                ) : dayAppointments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma consulta neste dia.</p>
+                ) : (
+                  dayAppointments.map((a) => (
+                    <div key={a.id} className="rounded-[18px] border border-border bg-muted/20 px-4 py-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-foreground">{a.petName}</p>
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs text-primary">{VET_STATUS_LABEL[a.status] ?? a.status}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{a.time?.slice(0, 5)} • {a.clinicName || 'Atendimento'}</p>
+                      <p className="text-sm text-muted-foreground">{a.reason}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
         <section className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
@@ -527,6 +592,8 @@ export default function VeterinarianScheduleScreen() {
             </div>
           </div>
         </section>
+          </>
+        )}
     </VeterinarianShell>
   );
 }

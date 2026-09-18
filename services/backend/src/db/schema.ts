@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS veterinarians (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uq_veterinarian_crmv_state UNIQUE (crmv, crmv_uf)
 );
+ALTER TABLE veterinarians ADD COLUMN IF NOT EXISTS working_hours JSONB;
 CREATE TABLE IF NOT EXISTS clinic_veterinarians (
   id UUID PRIMARY KEY, clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE, veterinarian_id UUID NOT NULL REFERENCES veterinarians(id) ON DELETE CASCADE,
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
