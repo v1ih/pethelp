@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { getDashboardRouteForUserType, getSettingsRouteForUserType, type UserType } from './context/shared';
 import { usePets } from './context/PetsContext';
 import { useSession } from './context/SessionContext';
@@ -29,10 +30,20 @@ export function useAppNavigation() {
     navigate(getPetContextRoute(user?.userType, !!currentPet), { replace: true });
   }, [navigate, user?.userType, currentPet]);
 
-  const confirmAndLogout = useCallback((message = 'Deseja realmente sair da conta?') => {
-    if (!confirm(message)) return false;
-    logout();
-    goToLogin();
+  const confirmAndLogout = useCallback((message = 'Deseja sair da conta?') => {
+    // Popup de confirmação (mais bonito que o confirm do navegador).
+    toast(message, {
+      id: 'confirm-logout',
+      duration: 10000,
+      action: {
+        label: 'Sair',
+        onClick: () => {
+          logout();
+          goToLogin();
+        },
+      },
+      cancel: { label: 'Cancelar', onClick: () => {} },
+    });
     return true;
   }, [goToLogin, logout]);
 

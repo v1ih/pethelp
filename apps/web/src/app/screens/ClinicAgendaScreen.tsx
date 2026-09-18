@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { CalendarDays, CheckCircle2, Clock3, LayoutList, Save, Stethoscope } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { useSession } from '../context/SessionContext';
@@ -78,7 +79,6 @@ export default function ClinicAgendaScreen() {
   const [selectedVetId, setSelectedVetId] = useState('');
   const [hours, setHours] = useState<WorkingHours>(defaultHours());
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const API_BASE = getApiBase();
 
   const dayAppointments = useMemo(
@@ -119,7 +119,6 @@ export default function ClinicAgendaScreen() {
   useEffect(() => {
     if (!selectedVet) return;
     setHours(normalizeHours(selectedVet.veterinarianWorkingHours));
-    setFeedback(null);
   }, [selectedVet]);
 
   const setDay = (key: string, field: 'open' | 'close', value: string) => {
@@ -133,7 +132,6 @@ export default function ClinicAgendaScreen() {
   const handleSave = async () => {
     if (!selectedVet) return;
     setSaving(true);
-    setFeedback(null);
     try {
       const resp = await fetch(`${API_BASE}/api/clinic-links/veterinarians/${selectedVet.veterinarianId}/working-hours`, {
         method: 'PATCH',
@@ -146,9 +144,9 @@ export default function ClinicAgendaScreen() {
       }
       // Atualiza a lista local para refletir o horário salvo.
       setLinks((prev) => prev.map((link) => (link.veterinarianId === selectedVet.veterinarianId ? { ...link, veterinarianWorkingHours: hours } : link)));
-      setFeedback({ type: 'success', message: 'Horário de atendimento salvo com sucesso.' });
+      toast.success('Horário de atendimento salvo com sucesso.');
     } catch (error) {
-      setFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Não foi possível salvar.' });
+      toast.error(error instanceof Error ? error.message : 'Não foi possível salvar.');
     } finally {
       setSaving(false);
     }
@@ -177,11 +175,6 @@ export default function ClinicAgendaScreen() {
       }
     >
       <div className="space-y-6">
-        {feedback ? (
-          <div className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-            {feedback.message}
-          </div>
-        ) : null}
 
         <div className="flex w-max items-center gap-1 rounded-full border border-border bg-card p-1 shadow-sm">
           <button

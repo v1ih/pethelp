@@ -143,21 +143,10 @@ export default function ClinicDashboardScreen() {
       }
     >
       <div className="space-y-6">
-        <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <section>
           <div className="rounded-[32px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary">
-                  <ShieldAlert className="h-4 w-4" />
-                  Código de conexão ativo
-                </div>
-                <h2 className="mt-4 text-3xl font-medium tracking-tight text-foreground sm:text-[38px]">Dashboard da clínica</h2>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  Use este painel para compartilhar o código da clínica, acompanhar avaliações e entrar rapidamente nos fluxos de veterinários, agenda e histórico.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:w-[380px] xl:grid-cols-2">
+            <div>
+              <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
                 <div className="rounded-[24px] border border-border bg-background p-4 text-center">
                   <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Veterinários</p>
                   <p className="mt-2 text-3xl text-foreground">{approvedLinks.length}</p>
@@ -226,65 +215,6 @@ export default function ClinicDashboardScreen() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Status operacional</p>
-                  <h3 className="text-2xl font-medium text-foreground">Resumo rápido</h3>
-                </div>
-                <MessageSquare className="h-6 w-6 text-primary" />
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <div className="rounded-[22px] border border-border bg-muted/20 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Vínculos ativos</p>
-                  <p className="mt-1 text-2xl text-foreground">{approvedLinks.length}</p>
-                </div>
-                <div className="rounded-[22px] border border-border bg-muted/20 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Solicitações abertas</p>
-                  <p className="mt-1 text-2xl text-foreground">{pendingLinks.length}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Atalhos</p>
-                  <h3 className="text-2xl font-medium text-foreground">Fluxos da clínica</h3>
-                </div>
-                <Stethoscope className="h-6 w-6 text-primary" />
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/clinic-veterinarians')}
-                  className="rounded-[22px] border border-border bg-background px-4 py-4 text-left transition-colors hover:bg-muted/60"
-                >
-                  <p className="text-foreground">Gerenciar veterinários</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Aprovar, recusar ou desvincular profissionais.</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/clinic-agenda')}
-                  className="rounded-[22px] border border-border bg-background px-4 py-4 text-left transition-colors hover:bg-muted/60"
-                >
-                  <p className="text-foreground">Agenda da clínica</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Cadastre e organize os horários por veterinário.</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/clinic-history')}
-                  className="rounded-[22px] border border-border bg-background px-4 py-4 text-left transition-colors hover:bg-muted/60"
-                >
-                  <p className="text-foreground">Histórico de atendimentos</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Consulte consultas concluídas e avaliações recebidas.</p>
-                </button>
-              </div>
-            </div>
-          </div>
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">

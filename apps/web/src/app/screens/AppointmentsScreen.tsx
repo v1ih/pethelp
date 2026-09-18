@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import { Calendar, CalendarDays, CalendarPlus, Clock, LayoutList, Lock, Mail, MessageCircle, MessageSquare, PenLine, Plus, Star, Trash2, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -179,7 +180,6 @@ export default function AppointmentsScreen() {
   const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -429,28 +429,24 @@ export default function AppointmentsScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFeedback(null);
 
     if (!currentPet) {
-      setFeedback({ type: 'error', message: 'Selecione um pet antes de agendar.' });
+      toast.error('Selecione um pet antes de agendar.');
       return;
     }
 
     if (targetType === 'clinic' && !selectedClinicItem) {
-      setFeedback({ type: 'error', message: 'Selecione uma clínica para continuar.' });
+      toast.error('Selecione uma clínica para continuar.');
       return;
     }
 
     if (!selectedCatalogItem) {
-      setFeedback({
-        type: 'error',
-        message: targetType === 'clinic' ? 'Selecione um veterinário disponível da clínica.' : 'Selecione um veterinário.',
-      });
+      toast.error(targetType === 'clinic' ? 'Selecione um veterinário disponível da clínica.' : 'Selecione um veterinário.');
       return;
     }
 
     if (!date || !time || !reason.trim()) {
-      setFeedback({ type: 'error', message: 'Preencha data, horário e motivo.' });
+      toast.error('Preencha data, horário e motivo.');
       return;
     }
 
@@ -458,12 +454,12 @@ export default function AppointmentsScreen() {
     const vetPass = vetPassCode.trim().toUpperCase();
 
     if (availability.loading) {
-      setFeedback({ type: 'error', message: 'Aguarde a verificação de disponibilidade.' });
+      toast.error('Aguarde a verificação de disponibilidade.');
       return;
     }
 
     if (availability.isAvailable !== true) {
-      setFeedback({ type: 'error', message: availability.message || 'Escolha um horário disponível.' });
+      toast.error(availability.message || 'Escolha um horário disponível.');
       return;
     }
 
@@ -487,7 +483,7 @@ export default function AppointmentsScreen() {
 
     try {
       await addAppointment(appointmentPayload);
-      setFeedback({ type: 'success', message: 'Consulta agendada com sucesso.' });
+      toast.success('Consulta agendada com sucesso.');
       setShowNewAppointment(false);
       setTargetType('clinic');
       setSelectedClinicId('');
@@ -501,7 +497,7 @@ export default function AppointmentsScreen() {
       setAvailability(initialAvailability);
     } catch (error) {
       console.error('Falha ao agendar consulta:', error);
-      setFeedback({ type: 'error', message: 'Não foi possível agendar a consulta.' });
+      toast.error('Não foi possível agendar a consulta.');
     }
   };
 
@@ -560,12 +556,6 @@ export default function AppointmentsScreen() {
       actions={user?.userType === 'owner' ? <button onClick={() => setShowNewAppointment(true)} className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"><Plus className="h-5 w-5" />Nova Consulta</button> : null}
     >
       <div className="space-y-6">
-        {feedback ? (
-          <div className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-            {feedback.message}
-          </div>
-        ) : null}
-
         {showNewAppointment && (
           <section className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
             <div className="mb-6 flex items-center justify-between gap-3">

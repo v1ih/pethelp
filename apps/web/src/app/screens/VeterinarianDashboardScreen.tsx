@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { toast } from 'sonner';
 import {
   AlertCircle,
   CalendarDays,
@@ -180,7 +181,6 @@ export default function VeterinarianDashboardScreen() {
   const [loadingPatient, setLoadingPatient] = useState(false);
   const [savingRecord, setSavingRecord] = useState(false);
   const [savingVaccine, setSavingVaccine] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [recordDate, setRecordDate] = useState('');
   const [recordDescription, setRecordDescription] = useState('');
@@ -260,7 +260,7 @@ export default function VeterinarianDashboardScreen() {
       } catch (error) {
         console.error('Falha ao carregar dados do paciente:', error);
         if (!cancelled) {
-          setFeedback({ type: 'error', message: 'Não foi possível carregar os dados do paciente validado.' });
+          toast.error('Não foi possível carregar os dados do paciente validado.');
         }
       } finally {
         if (!cancelled) {
@@ -311,12 +311,11 @@ export default function VeterinarianDashboardScreen() {
   const handleRedeemVetPass = async () => {
     const code = vetPassCode.trim().toUpperCase();
     if (!code) {
-      setFeedback({ type: 'error', message: 'Informe o código do Vet-Pass.' });
+      toast.error('Informe o código do Vet-Pass.');
       return;
     }
 
     setLoadingPass(true);
-    setFeedback(null);
 
     try {
       const resp = await fetch(`${API_BASE}/api/vet-passes/${code}/redeem`, {
@@ -330,10 +329,10 @@ export default function VeterinarianDashboardScreen() {
 
       const json = await resp.json();
       setActivePass(normalizeVetPassRecord(json.data));
-      setFeedback({ type: 'success', message: 'Vet-Pass validado com sucesso. O prontuário foi liberado para atendimento.' });
+      toast.success('Vet-Pass validado com sucesso. O prontuário foi liberado para atendimento.');
     } catch (error) {
       console.error('Falha ao validar Vet-Pass:', error);
-      setFeedback({ type: 'error', message: 'Código inválido, expirado ou já utilizado.' });
+      toast.error('Código inválido, expirado ou já utilizado.');
       setActivePass(null);
     } finally {
       setLoadingPass(false);
@@ -363,10 +362,10 @@ export default function VeterinarianDashboardScreen() {
       setVaccineDate('');
       setVaccineNextDose('');
       setVaccineClinicName('');
-      setFeedback({ type: 'success', message: 'Sessão encerrada com sucesso.' });
+      toast.success('Sessão encerrada com sucesso.');
     } catch (error) {
       console.error('Falha ao encerrar a sessão:', error);
-      setFeedback({ type: 'error', message: 'Não foi possível encerrar a sessão.' });
+      toast.error('Não foi possível encerrar a sessão.');
     }
   };
 
@@ -375,18 +374,17 @@ export default function VeterinarianDashboardScreen() {
     if (!activePass) return;
 
     if (!recordDate || !recordDescription.trim()) {
-      setFeedback({ type: 'error', message: 'Data e descrição do atendimento são obrigatórias.' });
+      toast.error('Data e descrição do atendimento são obrigatórias.');
       return;
     }
 
     const invalidFile = recordFiles.find((file) => !isSupportedFile(file));
     if (invalidFile) {
-      setFeedback({ type: 'error', message: 'Apenas arquivos PDF, JPG e PNG são aceitos nos anexos.' });
+      toast.error('Apenas arquivos PDF, JPG e PNG são aceitos nos anexos.');
       return;
     }
 
     setSavingRecord(true);
-    setFeedback(null);
 
     try {
       const documents = await Promise.all(recordFiles.map(async (file) => encodeFile(file, await fileToDataUrl(file))));
@@ -410,7 +408,7 @@ export default function VeterinarianDashboardScreen() {
         throw new Error(await readApiErrorMessage(resp, 'Create medical record failed'));
       }
 
-      setFeedback({ type: 'success', message: 'Novo registro clínico adicionado com sucesso.' });
+      toast.success('Novo registro clínico adicionado com sucesso.');
       setRecordDate('');
       setRecordDescription('');
       setRecordClinicName('');
@@ -424,7 +422,7 @@ export default function VeterinarianDashboardScreen() {
       }
     } catch (error) {
       console.error('Falha ao salvar registro clínico:', error);
-      setFeedback({ type: 'error', message: 'Não foi possível salvar o registro clínico.' });
+      toast.error('Não foi possível salvar o registro clínico.');
     } finally {
       setSavingRecord(false);
     }
@@ -435,12 +433,11 @@ export default function VeterinarianDashboardScreen() {
     if (!activePass) return;
 
     if (!vaccineName.trim() || !vaccineDate) {
-      setFeedback({ type: 'error', message: 'Nome e data da vacina são obrigatórios.' });
+      toast.error('Nome e data da vacina são obrigatórios.');
       return;
     }
 
     setSavingVaccine(true);
-    setFeedback(null);
 
     try {
       const resp = await fetch(`${API_BASE}/api/vaccines/pet/${activePass.petId}`, {
@@ -462,7 +459,7 @@ export default function VeterinarianDashboardScreen() {
         throw new Error(await readApiErrorMessage(resp, 'Create vaccine failed'));
       }
 
-      setFeedback({ type: 'success', message: 'Vacina registrada com sucesso.' });
+      toast.success('Vacina registrada com sucesso.');
       setVaccineName('');
       setVaccineDate('');
       setVaccineNextDose('');
@@ -475,7 +472,7 @@ export default function VeterinarianDashboardScreen() {
       }
     } catch (error) {
       console.error('Falha ao registrar vacina:', error);
-      setFeedback({ type: 'error', message: 'Não foi possível registrar a vacina.' });
+      toast.error('Não foi possível registrar a vacina.');
     } finally {
       setSavingVaccine(false);
     }
@@ -518,18 +515,6 @@ export default function VeterinarianDashboardScreen() {
             </div>
           </div>
         </section>
-
-        {feedback && (
-          <div
-            className={`mt-6 rounded-2xl border px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'border-green-200 bg-green-50 text-green-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}
-          >
-            {feedback.message}
-          </div>
-        )}
 
         <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.95fr]">
           <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
@@ -852,6 +837,8 @@ export default function VeterinarianDashboardScreen() {
           </section>
         )}
 
+        {hasActivePatient && (
+          <>
         <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.95fr]">
           <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
@@ -1063,6 +1050,8 @@ export default function VeterinarianDashboardScreen() {
             )}
           </div>
         </section>
+          </>
+        )}
 
         <section className="mt-6 rounded-[28px] border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start gap-3">
