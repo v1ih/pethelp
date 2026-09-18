@@ -62,6 +62,16 @@ CREATE TABLE IF NOT EXISTS appointments (
   reason TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','completed','cancelled')),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Remove agendamentos duplicados (mesmo vet/data/hora), mantendo o mais antigo.
+DELETE FROM appointments a USING appointments b
+  WHERE a.status = 'scheduled' AND b.status = 'scheduled'
+    AND a.veterinarian_id IS NOT NULL AND a.veterinarian_id = b.veterinarian_id
+    AND a.appointment_date = b.appointment_date AND a.appointment_time = b.appointment_time
+    AND (a.created_at, a.id) > (b.created_at, b.id);
+-- Impede o mesmo veterinário ter dois agendamentos no mesmo horário.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_appointment_vet_slot
+  ON appointments (veterinarian_id, appointment_date, appointment_time)
+  WHERE status = 'scheduled' AND veterinarian_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS reviews (
   id UUID PRIMARY KEY, appointment_id UUID NOT NULL UNIQUE REFERENCES appointments(id) ON DELETE CASCADE,
   pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE, tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,

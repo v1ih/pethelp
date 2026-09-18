@@ -13,6 +13,7 @@ export default function VaccinationScreen() {
   const { goToPetContext } = useAppNavigation();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
@@ -60,6 +61,7 @@ export default function VaccinationScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!name || !date) return;
 
     const payload = {
@@ -70,13 +72,17 @@ export default function VaccinationScreen() {
       clinicName: clinicName || undefined,
     };
 
-    if (editingId) {
-      await updateVaccine(editingId, payload);
-    } else {
-      await addVaccine({ petId: currentPet.id, ...payload });
+    setSaving(true);
+    try {
+      if (editingId) {
+        await updateVaccine(editingId, payload);
+      } else {
+        await addVaccine({ petId: currentPet.id, ...payload });
+      }
+      clearForm();
+    } finally {
+      setSaving(false);
     }
-
-    clearForm();
   };
 
   return (
@@ -109,7 +115,7 @@ export default function VaccinationScreen() {
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={clearForm} className="rounded-[18px] border border-border bg-background px-4 py-3 text-muted-foreground transition-colors hover:bg-muted">Cancelar</button>
-              <button type="submit" className="rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90">{editingId ? 'Atualizar Registro' : 'Salvar Registro'}</button>
+              <button type="submit" disabled={saving} className="rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">{saving ? 'Salvando...' : editingId ? 'Atualizar Registro' : 'Salvar Registro'}</button>
             </div>
           </form>
         )}

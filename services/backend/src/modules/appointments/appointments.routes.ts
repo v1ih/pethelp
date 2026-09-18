@@ -623,6 +623,11 @@ router.post('/', async (req: AuthRequest, res, next) => {
     res.status(201).json({ data: normalizeAppointment(created) });
   } catch (error) {
     await connection.rollback();
+    // Índice único de slot: se dois pedidos tentarem o mesmo horário ao mesmo tempo.
+    if ((error as { code?: string })?.code === '23505') {
+      res.status(409).json({ message: 'Este horário acabou de ser reservado. Escolha outro horário.' });
+      return;
+    }
     next(error);
   } finally {
     connection.release();

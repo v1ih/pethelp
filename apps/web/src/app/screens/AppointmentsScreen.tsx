@@ -176,8 +176,10 @@ export default function AppointmentsScreen() {
   const [loadingClinics, setLoadingClinics] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [availability, setAvailability] = useState<AvailabilityState>(initialAvailability);
+  const [submitting, setSubmitting] = useState(false);
   const [slotState, setSlotState] = useState<{ loading: boolean; slots: string[]; note: string }>({ loading: false, slots: [], note: '' });
   const [reviewAppointmentId, setReviewAppointmentId] = useState<string | null>(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [view, setView] = useState<'calendar' | 'list'>('calendar');
@@ -430,6 +432,8 @@ export default function AppointmentsScreen() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (submitting) return; // evita clique duplo agendando várias vezes
+
     if (!currentPet) {
       toast.error('Selecione um pet antes de agendar.');
       return;
@@ -481,6 +485,7 @@ export default function AppointmentsScreen() {
       ownerId: user?.id ?? '',
     };
 
+    setSubmitting(true);
     try {
       await addAppointment(appointmentPayload);
       toast.success('Consulta agendada com sucesso.');
@@ -498,6 +503,8 @@ export default function AppointmentsScreen() {
     } catch (error) {
       console.error('Falha ao agendar consulta:', error);
       toast.error('Não foi possível agendar a consulta.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -516,22 +523,31 @@ export default function AppointmentsScreen() {
     setReviewComment('');
   };
 
-  const submitReview = (e: React.FormEvent) => {
+  const submitReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (reviewSaving) return;
     if (!activeReviewAppointment || activeReviewAppointment.status !== 'completed' || !user) return;
-    upsertReview({
-      id: activeReview?.id,
-      tutorId: user.id,
-      tutorName: user.name,
-      veterinarianId: activeReviewAppointment.veterinarianId ?? activeReviewAppointment.clinicId ?? '',
-      veterinarianName: activeReviewAppointment.veterinarianName || activeReviewAppointment.clinicName || '',
-      clinicName: activeReviewAppointment.clinicName ?? undefined,
-      appointmentId: activeReviewAppointment.id,
-      petId: activeReviewAppointment.petId,
-      rating: reviewRating,
-      comment: reviewComment.trim() || 'Sem comentário',
-    });
-    closeReview();
+    setReviewSaving(true);
+    try {
+      await upsertReview({
+        id: activeReview?.id,
+        tutorId: user.id,
+        tutorName: user.name,
+        veterinarianId: activeReviewAppointment.veterinarianId ?? activeReviewAppointment.clinicId ?? '',
+        veterinarianName: activeReviewAppointment.veterinarianName || activeReviewAppointment.clinicName || '',
+        clinicName: activeReviewAppointment.clinicName ?? undefined,
+        appointmentId: activeReviewAppointment.id,
+        petId: activeReviewAppointment.petId,
+        rating: reviewRating,
+        comment: reviewComment.trim() || 'Sem comentário',
+      });
+      closeReview();
+    } catch (error) {
+      console.error('Falha ao salvar avaliação:', error);
+      toast.error('Não foi possível salvar a avaliação.');
+    } finally {
+      setReviewSaving(false);
+    }
   };
 
   const removeReview = () => {
@@ -718,8 +734,8 @@ export default function AppointmentsScreen() {
                 <p>{availability.loading ? 'Verificando disponibilidade...' : availability.message}</p>
               </div>
 
-              <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary py-3 text-white transition-colors hover:bg-primary/90">
-                Confirmar Agendamento
+              <button type="submit" disabled={submitting} className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+                {submitting ? 'Agendando...' : 'Confirmar Agendamento'}
               </button>
             </form>
           </section>
@@ -939,7 +955,7 @@ export default function AppointmentsScreen() {
                 <div>{activeReview && <button type="button" onClick={removeReview} className="inline-flex items-center gap-2 rounded-[18px] border border-rose-300 bg-rose-50 px-4 py-2 text-rose-700 transition-colors hover:bg-rose-100"><Trash2 className="h-4 w-4" />Excluir</button>}</div>
                 <div className="flex gap-2">
                   <button type="button" onClick={closeReview} className="rounded-[18px] border border-border px-4 py-2 text-foreground transition-colors hover:bg-muted">Cancelar</button>
-                  <button type="submit" className="rounded-[18px] bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90">Salvar avaliação</button>
+                  <button type="submit" disabled={reviewSaving} className="rounded-[18px] bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">{reviewSaving ? 'Salvando...' : 'Salvar avaliação'}</button>
                 </div>
               </div>
             </form>

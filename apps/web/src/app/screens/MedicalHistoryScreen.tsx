@@ -73,6 +73,7 @@ export default function MedicalHistoryScreen() {
   const [treatment, setTreatment] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (isVeterinarian) {
     const sortedVeterinarianRecords = medicalRecords.slice().sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
@@ -241,6 +242,7 @@ export default function MedicalHistoryScreen() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!date || !description.trim()) return;
 
     const invalidFile = selectedFiles.find((file) => !isSupportedFile(file));
@@ -250,6 +252,7 @@ export default function MedicalHistoryScreen() {
     }
 
     setFeedback(null);
+    setSaving(true);
 
     try {
       const newDocuments = await Promise.all(selectedFiles.map(async (file) => {
@@ -286,6 +289,8 @@ export default function MedicalHistoryScreen() {
     } catch (error) {
       console.error('Falha ao salvar registro medico:', error);
       setFeedback({ type: 'error', message: 'Não foi possível salvar o registro médico.' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -379,8 +384,8 @@ export default function MedicalHistoryScreen() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={clearForm} className="rounded-[18px] border border-border bg-background px-4 py-3 text-muted-foreground transition-colors hover:bg-muted">Cancelar</button>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90">
-                <Upload className="h-4 w-4" /> {editingId ? 'Atualizar Registro' : 'Salvar Registro'}
+              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+                <Upload className="h-4 w-4" /> {saving ? 'Salvando...' : editingId ? 'Atualizar Registro' : 'Salvar Registro'}
               </button>
             </div>
           </form>
