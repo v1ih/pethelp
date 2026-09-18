@@ -16,6 +16,7 @@ import PetTransferScreen from './screens/PetTransferScreen';
 import MedicalHistoryScreen from './screens/MedicalHistoryScreen';
 import VaccinationScreen from './screens/VaccinationScreen';
 import ExamsScreen from './screens/ExamsScreen';
+import SharesScreen from './screens/SharesScreen';
 import AppointmentsScreen from './screens/AppointmentsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import ConnectionScreen from './screens/ConnectionScreen';
@@ -172,6 +173,10 @@ export const router = createBrowserRouter([
   {
     path: '/exams',
     Component: withAllowedUserTypes(ExamsScreen, ['owner', 'veterinarian']),
+  },
+  {
+    path: '/shares',
+    Component: withAllowedUserTypes(SharesScreen, ['owner']),
   },
   {
     path: '/appointments',

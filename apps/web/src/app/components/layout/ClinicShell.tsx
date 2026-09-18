@@ -4,6 +4,7 @@ import {
   Bell,
   CalendarDays,
   ClipboardList,
+  HelpCircle,
   Home,
   LogOut,
   Settings,
@@ -13,6 +14,7 @@ import {
 import { ThemeToggle } from './ThemeToggle';
 import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
+import { useOnboarding } from '../../context/OnboardingContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 
@@ -64,6 +66,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
   const { user } = useSession();
   const { notifications } = useInteraction();
   const { confirmAndLogout } = useAppNavigation();
+  const { openHelp } = useOnboarding();
 
   const clinicName = user?.clinicName || user?.name || 'Clínica';
   const unreadNotifications = notifications.filter((notification) => notification.userId === user?.id && !notification.read).length;
@@ -98,6 +101,15 @@ export function ClinicShell({ active, title, description, actions, children }: C
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Clínica</span>
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={openHelp}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              aria-label="Ajuda e tutorial"
+              title="Ajuda e tutorial"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
             <button
               type="button"
               onClick={() => navigate('/clinic-notifications')}

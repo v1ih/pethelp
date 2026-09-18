@@ -124,6 +124,8 @@ export interface VetPassRecord {
   includesMedicalRecords?: boolean;
   includesVaccines?: boolean;
   includesExams?: boolean;
+  redeemedByName?: string;
+  redeemedByEmail?: string;
 }
 
 export interface User {

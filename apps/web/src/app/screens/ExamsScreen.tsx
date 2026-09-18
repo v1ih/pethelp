@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { ArrowLeft, Copy, Download, Eye, FileText, Mail, Paperclip, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { decodeExamDocument, getApiBase, getAuthHeaders, type VetPassRecord } from '../context/shared';
@@ -57,35 +58,16 @@ export default function ExamsScreen() {
   const { medicalRecords } = useHealth();
   const { user } = useSession();
   const { goToPetContext } = useAppNavigation();
+  const navigate = useNavigate();
   const [previewAttachment, setPreviewAttachment] = useState<PreviewAttachment | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [vetPassCode, setVetPassCode] = useState('');
   const [createdPass, setCreatedPass] = useState<VetPassRecord | null>(null);
   const [redeemedPass, setRedeemedPass] = useState<VetPassRecord | null>(null);
-  const [savedPasses, setSavedPasses] = useState<VetPassRecord[]>([]);
   const [emailingCode, setEmailingCode] = useState<string | null>(null);
   const [passScope, setPassScope] = useState({ medicalRecords: true, vaccines: true, exams: true });
   const [passDays, setPassDays] = useState(30);
   const API_BASE = getApiBase();
-
-  // Carrega os Vet-Pass já gerados pelo responsável (ficam salvos no servidor,
-  // então continuam disponíveis mesmo depois de sair e entrar de novo).
-  const loadSavedPasses = async () => {
-    if (user?.userType !== 'tutor') return;
-    try {
-      const resp = await fetch(`${API_BASE}/api/vet-passes/me`, { headers: getAuthHeaders() });
-      if (!resp.ok) return;
-      const { data } = await resp.json();
-      setSavedPasses(((data ?? []) as any[]).map(toUiVetPass));
-    } catch (error) {
-      console.error('Falha ao carregar Vet-Pass salvos:', error);
-    }
-  };
-
-  useEffect(() => {
-    void loadSavedPasses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE, user?.userType]);
 
   const handleEmailPass = async (code: string) => {
     setEmailingCode(code);
@@ -167,7 +149,6 @@ export default function ExamsScreen() {
 
       const { data } = await resp.json();
       setCreatedPass(toUiVetPass(data));
-      void loadSavedPasses();
       toast.success('Vet-Pass gerado com sucesso!');
     } catch (error) {
       console.error('Falha ao gerar Vet-Pass:', error);
@@ -322,47 +303,18 @@ export default function ExamsScreen() {
                 )}
               </section>
 
-              {user?.userType === 'tutor' && savedPasses.filter((pass) => pass.petId === currentPet.id).length > 0 && (
-                <section className="rounded-[34px] border border-border/70 bg-card p-5 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
-                  <h2 className="mb-1 text-xl text-foreground">Meus Vet-Pass salvos</h2>
-                  <p className="mb-4 text-sm text-muted-foreground">Ficam guardados aqui mesmo depois de sair da conta. Copie ou envie por e-mail como backup.</p>
-                  <div className="space-y-3">
-                    {savedPasses
-                      .filter((pass) => pass.petId === currentPet.id)
-                      .map((pass) => {
-                        const expirado = new Date(pass.expiresAt).getTime() < Date.now();
-                        return (
-                          <div key={pass.code} className="rounded-[28px] border border-border bg-muted/20 p-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="break-all font-mono text-sm text-foreground">{pass.code}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {expirado ? 'Expirado em ' : 'Expira em '}
-                                  {new Date(pass.expiresAt).toLocaleDateString('pt-BR')}
-                                  {pass.redeemedAt ? ' • já utilizado' : ''}
-                                </p>
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {passScopeLabels(pass).map((label) => (
-                                    <span key={label} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] text-primary">{label}</span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 gap-2">
-                                <button type="button" onClick={() => { navigator.clipboard?.writeText(pass.code); toast.success('Código copiado.'); }} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted">
-                                  <Copy className="h-3.5 w-3.5" />
-                                  Copiar
-                                </button>
-                                <button type="button" onClick={() => void handleEmailPass(pass.code)} disabled={emailingCode === pass.code} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:opacity-50">
-                                  <Mail className="h-3.5 w-3.5" />
-                                  {emailingCode === pass.code ? 'Enviando...' : 'E-mail'}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </section>
+              {user?.userType === 'owner' && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/shares')}
+                  className="flex w-full items-center justify-between gap-3 rounded-[34px] border border-border/70 bg-card p-5 text-left shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] transition-colors hover:bg-muted/40"
+                >
+                  <span>
+                    <span className="block text-base text-foreground">Meus compartilhamentos</span>
+                    <span className="block text-sm text-muted-foreground">Veja todos os Vet-Pass, com quem estão compartilhados e encerre quando quiser.</span>
+                  </span>
+                  <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />
+                </button>
               )}
 
               {user?.userType === 'veterinarian' && (

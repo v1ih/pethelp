@@ -1,9 +1,10 @@
 ﻿import * as React from 'react';
 import { useNavigate } from 'react-router';
-import { Bell, CalendarDays, ClipboardList, Home, Link2, LogOut, Settings } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, HelpCircle, Home, Link2, LogOut, Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
+import { useOnboarding } from '../../context/OnboardingContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 import { getDashboardRouteForUserType, getSettingsRouteForUserType, type UserType } from '../../context/shared';
@@ -47,6 +48,7 @@ export default function VeterinarianShell({ active, title, description, actions,
   const { user } = useSession();
   const { notifications } = useInteraction();
   const { confirmAndLogout } = useAppNavigation();
+  const { openHelp } = useOnboarding();
 
   const currentUserType = user?.userType ?? 'veterinarian';
   const dashboardPath = getDashboardRouteForUserType(currentUserType);
@@ -80,6 +82,15 @@ export default function VeterinarianShell({ active, title, description, actions,
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Veterinário</span>
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={openHelp}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              aria-label="Ajuda e tutorial"
+              title="Ajuda e tutorial"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
             <button
               type="button"
               onClick={() => navigate('/veterinarian-notifications')}

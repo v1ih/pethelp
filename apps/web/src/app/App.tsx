@@ -6,6 +6,7 @@ import { PetsProvider } from './context/PetsContext';
 import { HealthProvider } from './context/HealthContext';
 import { ReviewsProvider } from './context/ReviewsContext';
 import { AppThemeProvider } from './components/layout/ThemeProvider';
+import { OnboardingProvider } from './context/OnboardingContext';
 import { Toaster } from './components/ui/sonner';
 
 export default function App() {
@@ -16,10 +17,12 @@ export default function App() {
           <PetsProvider>
             <ReviewsProvider>
               <HealthProvider>
-                <div className="size-full">
-                  <RouterProvider router={router} />
-                  <Toaster richColors closeButton />
-                </div>
+                <OnboardingProvider>
+                  <div className="size-full">
+                    <RouterProvider router={router} />
+                    <Toaster richColors closeButton />
+                  </div>
+                </OnboardingProvider>
               </HealthProvider>
             </ReviewsProvider>
           </PetsProvider>

@@ -22,6 +22,8 @@ type VetPassRow = RowDataPacket & {
   includes_medical_records: boolean;
   includes_vaccines: boolean;
   includes_exams: boolean;
+  redeemed_name?: string | null;
+  redeemed_email?: string | null;
 };
 
 type DbClient = Pick<PoolConnection, 'execute' | 'query'>;
@@ -78,6 +80,8 @@ function normalizeVetPass(row: VetPassRow) {
     includesMedicalRecords: row.includes_medical_records,
     includesVaccines: row.includes_vaccines,
     includesExams: row.includes_exams,
+    redeemedByName: row.redeemed_name ?? undefined,
+    redeemedByEmail: row.redeemed_email ?? undefined,
   };
 }
 
@@ -135,7 +139,17 @@ router.get('/me', async (req: AuthRequest, res, next) => {
     }
 
     const [rows] = await pool.query<VetPassRow[]>(
-      'SELECT * FROM vet_passes WHERE tutor_id = ? ORDER BY created_at DESC',
+      `
+        SELECT
+          vp.*,
+          v.name AS redeemed_name,
+          u.email AS redeemed_email
+        FROM vet_passes vp
+        LEFT JOIN users u ON u.id = vp.redeemed_by_user_id
+        LEFT JOIN veterinarians v ON v.user_id = vp.redeemed_by_user_id
+        WHERE vp.tutor_id = ?
+        ORDER BY vp.created_at DESC
+      `,
       [tutorId]
     );
 
