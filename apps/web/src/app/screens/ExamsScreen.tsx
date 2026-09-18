@@ -62,9 +62,52 @@ export default function ExamsScreen() {
   const [vetPassCode, setVetPassCode] = useState('');
   const [createdPass, setCreatedPass] = useState<VetPassRecord | null>(null);
   const [redeemedPass, setRedeemedPass] = useState<VetPassRecord | null>(null);
+  const [savedPasses, setSavedPasses] = useState<VetPassRecord[]>([]);
+  const [emailingCode, setEmailingCode] = useState<string | null>(null);
   const [passScope, setPassScope] = useState({ medicalRecords: true, vaccines: true, exams: true });
   const [passDays, setPassDays] = useState(30);
   const API_BASE = getApiBase();
+
+  // Carrega os Vet-Pass já gerados pelo responsável (ficam salvos no servidor,
+  // então continuam disponíveis mesmo depois de sair e entrar de novo).
+  const loadSavedPasses = async () => {
+    if (user?.userType !== 'tutor') return;
+    try {
+      const resp = await fetch(`${API_BASE}/api/vet-passes/me`, { headers: getAuthHeaders() });
+      if (!resp.ok) return;
+      const { data } = await resp.json();
+      setSavedPasses(((data ?? []) as any[]).map(toUiVetPass));
+    } catch (error) {
+      console.error('Falha ao carregar Vet-Pass salvos:', error);
+    }
+  };
+
+  useEffect(() => {
+    void loadSavedPasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [API_BASE, user?.userType]);
+
+  const handleEmailPass = async (code: string) => {
+    setEmailingCode(code);
+    try {
+      const resp = await fetch(`${API_BASE}/api/vet-passes/${code}/email`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const payload = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error(payload?.message ?? 'Falha ao enviar');
+      if (payload?.data?.sent) {
+        toast.success(`Vet-Pass enviado para ${payload.data.email}.`);
+      } else {
+        toast.message('Código pronto. O envio de e-mail não está configurado no servidor, mas o código continua salvo aqui.');
+      }
+    } catch (error) {
+      console.error('Falha ao enviar Vet-Pass por e-mail:', error);
+      toast.error('Não foi possível enviar o Vet-Pass por e-mail.');
+    } finally {
+      setEmailingCode(null);
+    }
+  };
 
   const attachments = useMemo(() => {
     return medicalRecords
@@ -124,6 +167,7 @@ export default function ExamsScreen() {
 
       const { data } = await resp.json();
       setCreatedPass(toUiVetPass(data));
+      void loadSavedPasses();
       toast.success('Vet-Pass gerado com sucesso!');
     } catch (error) {
       console.error('Falha ao gerar Vet-Pass:', error);
@@ -263,14 +307,63 @@ export default function ExamsScreen() {
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Código gerado</p>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <p className="break-all font-mono text-sm text-foreground">{createdPass.code}</p>
-                      <button type="button" onClick={() => navigator.clipboard?.writeText(createdPass.code)} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground">
-                        <Copy className="h-3.5 w-3.5" />
-                        Copiar
-                      </button>
+                      <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={() => { navigator.clipboard?.writeText(createdPass.code); toast.success('Código copiado.'); }} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted">
+                          <Copy className="h-3.5 w-3.5" />
+                          Copiar
+                        </button>
+                        <button type="button" onClick={() => void handleEmailPass(createdPass.code)} disabled={emailingCode === createdPass.code} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:opacity-50">
+                          <Mail className="h-3.5 w-3.5" />
+                          {emailingCode === createdPass.code ? 'Enviando...' : 'Enviar por e-mail'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
               </section>
+
+              {user?.userType === 'tutor' && savedPasses.filter((pass) => pass.petId === currentPet.id).length > 0 && (
+                <section className="rounded-[34px] border border-border/70 bg-card p-5 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+                  <h2 className="mb-1 text-xl text-foreground">Meus Vet-Pass salvos</h2>
+                  <p className="mb-4 text-sm text-muted-foreground">Ficam guardados aqui mesmo depois de sair da conta. Copie ou envie por e-mail como backup.</p>
+                  <div className="space-y-3">
+                    {savedPasses
+                      .filter((pass) => pass.petId === currentPet.id)
+                      .map((pass) => {
+                        const expirado = new Date(pass.expiresAt).getTime() < Date.now();
+                        return (
+                          <div key={pass.code} className="rounded-[28px] border border-border bg-muted/20 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="break-all font-mono text-sm text-foreground">{pass.code}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {expirado ? 'Expirado em ' : 'Expira em '}
+                                  {new Date(pass.expiresAt).toLocaleDateString('pt-BR')}
+                                  {pass.redeemedAt ? ' • já utilizado' : ''}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {passScopeLabels(pass).map((label) => (
+                                    <span key={label} className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] text-primary">{label}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 gap-2">
+                                <button type="button" onClick={() => { navigator.clipboard?.writeText(pass.code); toast.success('Código copiado.'); }} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted">
+                                  <Copy className="h-3.5 w-3.5" />
+                                  Copiar
+                                </button>
+                                <button type="button" onClick={() => void handleEmailPass(pass.code)} disabled={emailingCode === pass.code} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:opacity-50">
+                                  <Mail className="h-3.5 w-3.5" />
+                                  {emailingCode === pass.code ? 'Enviando...' : 'E-mail'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </section>
+              )}
 
               {user?.userType === 'veterinarian' && (
                 <section className="rounded-[34px] border border-border/70 bg-card p-5 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">

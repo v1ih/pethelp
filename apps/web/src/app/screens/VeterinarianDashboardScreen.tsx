@@ -90,6 +90,10 @@ function normalizeVetPassRecord(value: any): VetPassRecord {
     createdAt: value.createdAt ?? value.created_at ?? new Date().toISOString(),
     expiresAt: value.expiresAt ?? value.expires_at ?? new Date().toISOString(),
     redeemedAt: value.redeemedAt ?? value.redeemed_at ?? null,
+    // Escopo do passe. Passes antigos não têm os campos → assume tudo liberado.
+    includesMedicalRecords: value.includesMedicalRecords ?? value.includes_medical_records ?? true,
+    includesVaccines: value.includesVaccines ?? value.includes_vaccines ?? true,
+    includesExams: value.includesExams ?? value.includes_exams ?? true,
   };
 }
 
@@ -287,6 +291,15 @@ export default function VeterinarianDashboardScreen() {
   );
 
   const hasActivePatient = !!activePass;
+  // Escopo liberado pelo responsável no Vet-Pass (dados básicos do pet aparecem sempre).
+  const canRecords = activePass?.includesMedicalRecords !== false;
+  const canVaccines = activePass?.includesVaccines !== false;
+  const canExams = activePass?.includesExams !== false;
+  const blockedScopes = [
+    !canRecords ? 'prontuário' : null,
+    !canVaccines ? 'vacinas' : null,
+    !canExams ? 'exames' : null,
+  ].filter(Boolean) as string[];
   const currentPetName = petSummary?.name ?? activePass?.petName ?? 'Paciente';
   const activeAppointment = useMemo(
     () =>
@@ -677,8 +690,22 @@ export default function VeterinarianDashboardScreen() {
           </div>
         </section>
 
-        {hasActivePatient && (
+        {hasActivePatient && blockedScopes.length > 0 && (
+          <section className="mt-6 rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <p className="text-sm text-amber-800">
+                O responsável liberou este Vet-Pass apenas em parte. Não foi liberado:{' '}
+                <strong>{blockedScopes.join(', ')}</strong>. Peça um novo código com esses itens caso precise
+                registrar ou consultar essas informações.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {hasActivePatient && (canRecords || canVaccines) && (
           <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.92fr]">
+            {canRecords && (
             <form onSubmit={handleMedicalRecordSubmit} className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -770,7 +797,9 @@ export default function VeterinarianDashboardScreen() {
                 {savingRecord ? 'Salvando...' : 'Registrar atendimento'}
               </button>
             </form>
+            )}
 
+            {canVaccines && (
             <form onSubmit={handleVaccineSubmit} className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -834,12 +863,15 @@ export default function VeterinarianDashboardScreen() {
                 {savingVaccine ? 'Registrando...' : 'Registrar vacina'}
               </button>
             </form>
+            )}
           </section>
         )}
 
-        {hasActivePatient && (
+        {hasActivePatient && (canExams || canRecords || canVaccines) && (
           <>
+        {(canExams || canRecords) && (
         <section className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.95fr]">
+          {canExams && (
           <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -898,7 +930,9 @@ export default function VeterinarianDashboardScreen() {
               )}
             </div>
           </div>
+          )}
 
+          {canRecords && (
           <div className="rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -996,8 +1030,11 @@ export default function VeterinarianDashboardScreen() {
               )}
             </div>
           </div>
+          )}
         </section>
+        )}
 
+        {canVaccines && (
         <section className="mt-6 rounded-[28px] border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -1050,6 +1087,7 @@ export default function VeterinarianDashboardScreen() {
             )}
           </div>
         </section>
+        )}
           </>
         )}
 

@@ -4,7 +4,8 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from '../../db/ty
 import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
-import { findTutorByUserId } from '../users/users.service.js';
+import { findTutorByUserId, findUserById } from '../users/users.service.js';
+import { codeEmailTemplate, sendEmail } from '../mail/mailer.js';
 
 type VetPassRow = RowDataPacket & {
   id: string;
@@ -270,6 +271,53 @@ router.post('/:code/redeem', async (req: AuthRequest, res, next) => {
     next(error);
   } finally {
     connection.release();
+  }
+});
+
+/** Envia o código do Vet-Pass por e-mail para o próprio responsável (backup). */
+router.post('/:code/email', async (req: AuthRequest, res, next) => {
+  try {
+    const tutorId = await resolveCurrentTutorId(req.user);
+    if (!tutorId || !req.user?.id) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    const code = String(req.params.code).trim().toUpperCase();
+    const pass = await loadVetPassByCode(pool, code);
+    if (!pass || pass.tutor_id !== tutorId) {
+      res.status(404).json({ message: 'Vet-Pass not found' });
+      return;
+    }
+
+    const owner = await findUserById(req.user.id);
+    const email = owner?.email;
+    if (!email) {
+      res.status(404).json({ message: 'E-mail do responsável não encontrado' });
+      return;
+    }
+
+    const expira = new Date(pass.expires_at).toLocaleDateString('pt-BR');
+    const escopos = [
+      pass.includes_medical_records ? 'Prontuário' : null,
+      pass.includes_vaccines ? 'Vacinas' : null,
+      pass.includes_exams ? 'Exames' : null,
+    ].filter(Boolean).join(', ') || 'Nenhum';
+
+    const { sent } = await sendEmail(
+      email,
+      `Seu Vet-Pass do pet ${pass.pet_name} — PetHelp`,
+      codeEmailTemplate(
+        'Seu Vet-Pass (backup)',
+        `Guarde este código para liberar o atendimento de ${pass.pet_name} a um veterinário.`,
+        pass.pass_code,
+        `Libera: ${escopos}. Válido até ${expira}. Não compartilhe com pessoas que você não autorizou.`
+      )
+    );
+
+    res.json({ data: { sent, email } });
+  } catch (error) {
+    next(error);
   }
 });
 

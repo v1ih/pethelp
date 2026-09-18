@@ -11,7 +11,7 @@ import {
   findUserByEmail,
   findVeterinarianByUserId,
 } from '../users/users.service.js';
-import { isTutorGuardianOfPet } from './pet-access.js';
+import { canAccessPetHealthData, isTutorGuardianOfPet } from './pet-access.js';
 
 type PetRow = RowDataPacket & {
   id: string;
@@ -255,32 +255,18 @@ petsRouter.get('/', async (req: AuthRequest, res, next) => {
 
 petsRouter.get('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const row = await loadPetById(pool, String(req.params.id));
+    // Autoriza tutor/guardião, clínica vinculada, veterinário aprovado OU portador de
+    // Vet-Pass válido. Dados básicos do pet (idade, peso, alergias, condições) não
+    // dependem do escopo do passe — qualquer passe válido libera a identificação.
+    const access = await canAccessPetHealthData(req.user, String(req.params.id));
+    if (!access.allowed) {
+      res.status(access.status ?? 403).json({ message: access.message });
+      return;
+    }
 
+    const row = await loadPetById(pool, String(req.params.id));
     if (!row) {
       res.status(404).json({ message: 'Pet not found' });
-      return;
-    }
-
-    const tutorId = await resolveCurrentTutorId(req.user);
-    const clinicId = await resolveCurrentClinicId(req.user);
-    const accessibleClinicIds = req.user?.userType === 'veterinarian' ? await resolveAccessibleClinicIdsForVeterinarian(req.user) : [];
-
-    if (req.user?.userType === 'tutor') {
-      const isGuardian = Boolean(tutorId) && (row.current_tutor_id === tutorId || (await isTutorGuardianOfPet(row.id, tutorId!)));
-      if (!isGuardian) {
-        res.status(403).json({ message: 'Forbidden' });
-        return;
-      }
-    }
-
-    if (req.user?.userType === 'clinic' && (!clinicId || row.linked_clinic_id !== clinicId)) {
-      res.status(403).json({ message: 'Forbidden' });
-      return;
-    }
-
-    if (req.user?.userType === 'veterinarian' && !accessibleClinicIds.includes(row.linked_clinic_id ?? '')) {
-      res.status(403).json({ message: 'Forbidden' });
       return;
     }
 
