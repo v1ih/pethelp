@@ -17,6 +17,8 @@ type ReviewRow = RowDataPacket & {
   comment: string;
   created_at: Date;
   updated_at: Date;
+  tutor_name?: string | null;
+  veterinarian_name?: string | null;
 };
 
 type AppointmentAccessRow = RowDataPacket & {
@@ -130,6 +132,8 @@ function normalizeReview(row: ReviewRow) {
     clinicName: row.clinic_name ?? undefined,
     rating: Number(row.rating),
     comment: row.comment,
+    tutorName: row.tutor_name ?? undefined,
+    veterinarianName: row.veterinarian_name ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -139,17 +143,24 @@ router.use(requireAuth);
 
 router.get('/me', async (req: AuthRequest, res, next) => {
   try {
-    const reviewColumns = `
-      id,
-      appointment_id,
-      pet_id,
-      tutor_id,
-      veterinarian_id,
-      clinic_name,
-      rating,
-      comment,
-      created_at,
-      updated_at
+    // Traz também o nome de quem avaliou (tutor) e do veterinário avaliado.
+    const joinedReviewSelect = `
+      SELECT
+        r.id,
+        r.appointment_id,
+        r.pet_id,
+        r.tutor_id,
+        r.veterinarian_id,
+        r.clinic_name,
+        r.rating,
+        r.comment,
+        r.created_at,
+        r.updated_at,
+        t.name AS tutor_name,
+        v.name AS veterinarian_name
+      FROM reviews r
+      LEFT JOIN tutors t ON t.id = r.tutor_id
+      LEFT JOIN veterinarians v ON v.id = r.veterinarian_id
     `;
 
     if (req.user?.userType === 'tutor') {
@@ -160,7 +171,7 @@ router.get('/me', async (req: AuthRequest, res, next) => {
       }
 
       const [rows] = await pool.query<ReviewRow[]>(
-        `SELECT ${reviewColumns} FROM reviews WHERE tutor_id = ? ORDER BY created_at DESC`,
+        `${joinedReviewSelect} WHERE r.tutor_id = ? ORDER BY r.created_at DESC`,
         [tutorId]
       );
 
@@ -176,7 +187,7 @@ router.get('/me', async (req: AuthRequest, res, next) => {
       }
 
       const [rows] = await pool.query<ReviewRow[]>(
-        `SELECT ${reviewColumns} FROM reviews WHERE veterinarian_id = ? ORDER BY created_at DESC`,
+        `${joinedReviewSelect} WHERE r.veterinarian_id = ? ORDER BY r.created_at DESC`,
         [veterinarian.id]
       );
 
@@ -203,9 +214,13 @@ router.get('/me', async (req: AuthRequest, res, next) => {
             r.rating,
             r.comment,
             r.created_at,
-            r.updated_at
+            r.updated_at,
+            t.name AS tutor_name,
+            v.name AS veterinarian_name
           FROM reviews r
           JOIN appointments a ON a.id = r.appointment_id
+          LEFT JOIN tutors t ON t.id = r.tutor_id
+          LEFT JOIN veterinarians v ON v.id = r.veterinarian_id
           WHERE a.clinic_id = ? OR r.clinic_name = ?
           ORDER BY r.created_at DESC
         `,

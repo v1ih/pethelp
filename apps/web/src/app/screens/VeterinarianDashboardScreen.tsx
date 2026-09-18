@@ -13,12 +13,14 @@ import {
   Paperclip,
   Plus,
   ShieldCheck,
+  Star,
   Stethoscope,
   Syringe,
   Upload,
 } from 'lucide-react';
 import { decodeExamDocument, encodeExamDocument, getApiBase, getAuthHeaders, type MedicalRecord, type Vaccine, type VetPassRecord } from '../context/shared';
 import { useInteraction } from '../context/InteractionContext';
+import { useReviews } from '../context/ReviewsContext';
 import { useSession } from '../context/SessionContext';
 import { useDashboardBackLogout } from '../navigation';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
@@ -173,7 +175,10 @@ export default function VeterinarianDashboardScreen() {
   const navigate = useNavigate();
   const { user } = useSession();
   const { appointments, updateAppointment } = useInteraction();
+  const { reviews } = useReviews();
   useDashboardBackLogout();
+
+  const reviewAverage = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
 
   const [vetPassCode, setVetPassCode] = useState('');
   const [activePass, setActivePass] = useState<VetPassRecord | null>(null);
@@ -1090,6 +1095,43 @@ export default function VeterinarianDashboardScreen() {
         )}
           </>
         )}
+
+        <section className="mt-6 rounded-[28px] border border-border bg-card p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Reputação</p>
+              <h2 className="text-2xl text-foreground">Minhas avaliações</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 fill-current text-[#f4a64a]" />
+              <span className="text-2xl text-foreground">{reviewAverage > 0 ? reviewAverage.toFixed(1) : '—'}</span>
+              <span className="text-sm text-muted-foreground">({reviews.length})</span>
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {reviews.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                Você ainda não recebeu avaliações. Elas aparecem aqui quando um responsável avalia um atendimento concluído.
+              </div>
+            ) : (
+              reviews.map((review) => (
+                <div key={review.id} className="rounded-2xl border border-border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-foreground">{review.tutorName || 'Responsável'}</p>
+                    <div className="flex items-center gap-1 text-[#f4a64a]">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <Star key={index} className={`h-4 w-4 ${index < Math.round(review.rating) ? 'fill-current' : 'opacity-30'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  {review.comment ? <p className="mt-2 text-sm text-muted-foreground">"{review.comment}"</p> : null}
+                  <p className="mt-2 text-xs text-muted-foreground">{formatDateLabel(String(review.createdAt).slice(0, 10))}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         <section className="mt-6 rounded-[28px] border border-border bg-card p-6 shadow-sm">
           <div className="flex items-start gap-3">

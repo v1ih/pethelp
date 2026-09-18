@@ -5,6 +5,7 @@ import { ThemeToggle } from './ThemeToggle';
 import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { usePets } from '../../context/PetsContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 import { getDashboardRouteForUserType, getSettingsRouteForUserType, type UserType } from '../../context/shared';
@@ -49,6 +50,7 @@ export function TutorShell({ active, title, description, actions, children }: Tu
   const { notifications } = useInteraction();
   const { confirmAndLogout, goToSettings } = useAppNavigation();
   const { openHelp } = useOnboarding();
+  const { currentPet } = usePets();
 
   const unreadNotifications = notifications.filter((notification) => notification.userId === user?.id && !notification.read).length;
   const currentUserType = user?.userType ?? 'owner';
@@ -152,6 +154,34 @@ export function TutorShell({ active, title, description, actions, children }: Tu
               </button>
             ))}
           </div>
+
+          {currentUserType === 'owner' ? (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-[20px] border border-primary/25 bg-primary/5 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {currentPet?.photo ? (
+                  <img src={currentPet.photo} alt={currentPet.name} className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <PawPrint className="h-5 w-5" />
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Pet selecionado</p>
+                  <p className="truncate text-base font-medium text-foreground">
+                    {currentPet ? currentPet.name : 'Nenhum pet selecionado'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(dashboardPath)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                {currentPet ? 'Trocar' : 'Selecionar'}
+              </button>
+            </div>
+          ) : null}
 
           {(title || description || actions) ? (
             <section className="mb-6 rounded-[34px] border border-border/70 bg-card px-6 py-6 shadow-[0_28px_80px_-48px_rgba(127,162,106,0.26)] sm:px-8 sm:py-8">
