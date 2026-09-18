@@ -13,6 +13,7 @@ import { ClinicShell } from '../components/layout/ClinicShell';
 import { useSession } from '../context/SessionContext';
 import { useAppNavigation, useDashboardBackLogout } from '../navigation';
 import { maskCNPJ, maskPhone } from '../utils/masks';
+import PermissionsSection from '../components/settings/PermissionsSection';
 
 const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -213,6 +214,8 @@ export default function ClinicSettingsScreen() {
             </div>
           </form>
         </section>
+
+        <PermissionsSection />
 
         <section className="rounded-[32px] border border-red-200 bg-red-50/70 p-6 shadow-[0_24px_60px_-36px_rgba(239,68,68,0.1)] sm:p-8">
           <div className="flex items-start gap-4">

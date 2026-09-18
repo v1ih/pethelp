@@ -27,6 +27,7 @@ import { useSession } from '../context/SessionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { useAppNavigation, useDashboardBackLogout } from '../navigation';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
+import PermissionsSection from '../components/settings/PermissionsSection';
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, '');
@@ -425,6 +426,8 @@ export default function VeterinarianSettingsScreen() {
             Solicitações, conexões e pendências foram movidas para a tela dedicada de vínculos.
           </div>
         </section>
+
+        <PermissionsSection />
 
         <section className="mt-6 rounded-[28px] border border-red-200 bg-red-50/70 p-8">
           <div className="flex items-center gap-4 mb-6">

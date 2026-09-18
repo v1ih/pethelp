@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { Camera, PawPrint } from 'lucide-react';
 import { usePets } from '../context/PetsContext';
 import { TutorShell } from '../components/layout/TutorShell';
+import ImageCropper from '../components/pets/ImageCropper';
 
 export default function PetRegistrationScreen() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function PetRegistrationScreen() {
   const [breed, setBreed] = useState('');
   const [weight, setWeight] = useState('');
   const [photo, setPhoto] = useState('');
+  const [rawPhoto, setRawPhoto] = useState<string | null>(null); // imagem escolhida, aguardando recorte
   const [allergiesStr, setAllergiesStr] = useState('');
   const [conditionsStr, setConditionsStr] = useState('');
   const [loading, setLoading] = useState(false);
@@ -96,17 +98,26 @@ export default function PetRegistrationScreen() {
               {photo ? <img src={photo} alt="Pet" className="h-full w-full object-cover" /> : <Camera className="h-12 w-12 text-muted-foreground" />}
             </div>
             {photo ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setPhoto('');
-                  const input = document.getElementById('photo') as HTMLInputElement | null;
-                  if (input) input.value = '';
-                }}
-                className="mb-3 text-sm text-destructive underline underline-offset-2 hover:opacity-80"
-              >
-                Remover foto
-              </button>
+              <div className="mb-3 flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setRawPhoto(photo)}
+                  className="text-sm text-primary underline underline-offset-2 hover:opacity-80"
+                >
+                  Ajustar recorte
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoto('');
+                    const input = document.getElementById('photo') as HTMLInputElement | null;
+                    if (input) input.value = '';
+                  }}
+                  className="text-sm text-destructive underline underline-offset-2 hover:opacity-80"
+                >
+                  Remover foto
+                </button>
+              </div>
             ) : null}
             <div className="w-full">
               <label htmlFor="photo" className="mb-2 block text-center text-sm font-medium text-foreground">
@@ -122,7 +133,8 @@ export default function PetRegistrationScreen() {
 
                   const reader = new FileReader();
                   reader.onloadend = () => {
-                    setPhoto(reader.result as string);
+                    // Abre o recorte com a imagem escolhida.
+                    setRawPhoto(reader.result as string);
                   };
                   reader.readAsDataURL(file);
                 }}
@@ -200,6 +212,17 @@ export default function PetRegistrationScreen() {
           </div>
         </form>
       </div>
+
+      {rawPhoto ? (
+        <ImageCropper
+          src={rawPhoto}
+          onCancel={() => setRawPhoto(null)}
+          onApply={(dataUrl) => {
+            setPhoto(dataUrl);
+            setRawPhoto(null);
+          }}
+        />
+      ) : null}
     </TutorShell>
   );
 }

@@ -4,6 +4,7 @@ import { IdCard, Mail, Phone, Save, Settings, ShieldAlert, Trash2, User } from '
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
 import { useSession } from '../context/SessionContext';
 import { TutorShell } from '../components/layout/TutorShell';
+import PermissionsSection from '../components/settings/PermissionsSection';
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, '');
@@ -165,6 +166,8 @@ export default function OwnerProfileScreen() {
             </div>
           </form>
         </section>
+
+        <PermissionsSection />
 
         <section className="rounded-[34px] border border-red-200 bg-red-50 p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">
           <div className="mb-6 flex items-center gap-4">
