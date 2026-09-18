@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Copy, Download, Eye, FileText, Mail, Paperclip, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Copy, Download, Eye, FileText, Loader2, Mail, Paperclip, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { decodeExamDocument, getApiBase, getAuthHeaders, type VetPassRecord } from '../context/shared';
 import { useHealth } from '../context/HealthContext';
@@ -65,6 +65,7 @@ export default function ExamsScreen() {
   const [createdPass, setCreatedPass] = useState<VetPassRecord | null>(null);
   const [redeemedPass, setRedeemedPass] = useState<VetPassRecord | null>(null);
   const [emailingCode, setEmailingCode] = useState<string | null>(null);
+  const [generatingPass, setGeneratingPass] = useState(false);
   const [passScope, setPassScope] = useState({ medicalRecords: true, vaccines: true, exams: true });
   const [passDays, setPassDays] = useState(30);
   const API_BASE = getApiBase();
@@ -118,11 +119,13 @@ export default function ExamsScreen() {
   const selectedAttachments = attachments.filter((attachment) => selectedKeys.includes(attachment.key));
 
   const handleGenerateVetPass = async () => {
+    if (generatingPass) return; // evita clique duplo gerando vários passes
     if (!currentPet) {
       toast.error('Selecione um pet antes de gerar o Vet-Pass.');
       return;
     }
 
+    setGeneratingPass(true);
     try {
       const resp = await fetch(`${API_BASE}/api/vet-passes`, {
         method: 'POST',
@@ -153,6 +156,8 @@ export default function ExamsScreen() {
     } catch (error) {
       console.error('Falha ao gerar Vet-Pass:', error);
       toast.error('Não foi possível gerar o Vet-Pass. Tente novamente.');
+    } finally {
+      setGeneratingPass(false);
     }
   };
 
@@ -278,10 +283,10 @@ export default function ExamsScreen() {
                 <button
                   type="button"
                   onClick={() => void handleGenerateVetPass()}
-                  disabled={!passScope.medicalRecords && !passScope.vaccines && !passScope.exams}
+                  disabled={generatingPass || (!passScope.medicalRecords && !passScope.vaccines && !passScope.exams)}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
-                  <ShieldCheck className="h-4 w-4" />
-                  Gerar código
+                  {generatingPass ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {generatingPass ? 'Gerando...' : 'Gerar código'}
                 </button>
                 {createdPass && (
                   <div className="mt-4 rounded-[28px] border border-primary/20 bg-primary/5 p-4">
