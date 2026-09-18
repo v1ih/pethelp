@@ -15,6 +15,8 @@ export default function PetRegistrationScreen() {
   const [species, setSpecies] = useState('');
   // Seletor de espécie: 'Cachorro' | 'Gato' | 'Outro' (com campo livre) | ''
   const [speciesMode, setSpeciesMode] = useState('');
+  const [sex, setSex] = useState(''); // 'Macho' | 'Fêmea' | ''
+  const [neutered, setNeutered] = useState(''); // 'sim' | 'nao' | ''
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [weight, setWeight] = useState('');
@@ -34,6 +36,8 @@ export default function PetRegistrationScreen() {
       setName('');
       setSpecies('');
       setSpeciesMode('');
+      setSex('');
+      setNeutered('');
       setAge('');
       setBreed('');
       setWeight('');
@@ -46,6 +50,8 @@ export default function PetRegistrationScreen() {
     setName(selectedPet.name);
     setSpecies(selectedPet.species || '');
     setSpeciesMode(selectedPet.species ? (['Cachorro', 'Gato'].includes(selectedPet.species) ? selectedPet.species : 'Outro') : '');
+    setSex(selectedPet.sex || '');
+    setNeutered(selectedPet.neutered === true ? 'sim' : selectedPet.neutered === false ? 'nao' : '');
     // Idade/peso são guardados como "3 anos"/"25 kg"; no formulário editamos só o número.
     setAge((selectedPet.age || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
     setBreed(selectedPet.breed || '');
@@ -63,6 +69,8 @@ export default function PetRegistrationScreen() {
       const petPayload = {
         name: name.trim(),
         species: species.trim(),
+        sex: sex || null,
+        neutered: neutered === 'sim' ? true : neutered === 'nao' ? false : null,
         age: age.trim() ? `${age.trim().replace(',', '.')} ${age.trim().replace(',', '.') === '1' ? 'ano' : 'anos'}` : null,
         breed: breed.trim() || null,
         weight: weight.trim() ? `${weight.trim().replace(',', '.')} kg` : null,
@@ -189,6 +197,35 @@ export default function PetRegistrationScreen() {
                   required
                 />
               )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="sex" className="mb-2 block text-foreground">Sexo</label>
+                <select
+                  id="sex"
+                  value={sex}
+                  onChange={(e) => setSex(e.target.value)}
+                  className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+                >
+                  <option value="">Não informado</option>
+                  <option value="Macho">Macho</option>
+                  <option value="Fêmea">Fêmea</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="neutered" className="mb-2 block text-foreground">Castrado(a)</label>
+                <select
+                  id="neutered"
+                  value={neutered}
+                  onChange={(e) => setNeutered(e.target.value)}
+                  className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+                >
+                  <option value="">Não informado</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </select>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

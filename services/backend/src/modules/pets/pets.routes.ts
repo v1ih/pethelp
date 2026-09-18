@@ -25,6 +25,8 @@ type PetRow = RowDataPacket & {
   photo: string | null;
   allergies: string | null;
   conditions: string | null;
+  sex: string | null;
+  neutered: boolean | null;
   is_active: number | boolean;
   created_at: Date;
   updated_at: Date;
@@ -44,6 +46,8 @@ const petSelectFields = `
   photo,
   allergies,
   conditions,
+  sex,
+  neutered,
   is_active,
   created_at,
   updated_at
@@ -87,6 +91,8 @@ function normalizePet(row: PetRow) {
     photo: row.photo,
     allergies: parseSafeJson(row.allergies),
     conditions: parseSafeJson(row.conditions),
+    sex: row.sex ?? null,
+    neutered: row.neutered ?? null,
     isActive: Boolean(isActive),
     createdAt: (row as PetRow & { createdAt?: Date }).createdAt ?? row.created_at,
     updatedAt: (row as PetRow & { updatedAt?: Date }).updatedAt ?? row.updated_at,
@@ -297,6 +303,8 @@ petsRouter.post('/', async (req: AuthRequest, res, next) => {
     const photo = typeof body.photo === 'string' ? body.photo : null;
     const allergies = parseNullableJson(body.allergies);
     const conditions = parseNullableJson(body.conditions);
+    const sex = typeof body.sex === 'string' && body.sex.trim() ? body.sex.trim() : null;
+    const neutered = body.neutered === undefined || body.neutered === null ? null : toBoolean(body.neutered);
 
     if (!currentTutorId || !name || !species) {
       res.status(400).json({ message: 'name and species are required' });
@@ -318,10 +326,12 @@ petsRouter.post('/', async (req: AuthRequest, res, next) => {
           weight,
           photo,
           allergies,
-          conditions
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          conditions,
+          sex,
+          neutered
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [id, currentTutorId, name, species, breed, age, weight, photo, allergies, conditions]
+      [id, currentTutorId, name, species, breed, age, weight, photo, allergies, conditions, sex, neutered]
     );
 
     await connection.commit();
@@ -369,6 +379,8 @@ petsRouter.patch('/:id', async (req: AuthRequest, res, next) => {
       'photo',
       'allergies',
       'conditions',
+      'sex',
+      'neutered',
       'isActive',
     ] as const;
 
@@ -397,6 +409,8 @@ petsRouter.patch('/:id', async (req: AuthRequest, res, next) => {
         photo: 'photo',
         allergies: 'allergies',
         conditions: 'conditions',
+        sex: 'sex',
+        neutered: 'neutered',
         isActive: 'is_active',
       };
 
@@ -406,6 +420,8 @@ petsRouter.patch('/:id', async (req: AuthRequest, res, next) => {
         values.push(parseNullableJson(body[field]));
       } else if (field === 'isActive') {
         values.push(toBoolean(body[field]));
+      } else if (field === 'neutered') {
+        values.push(body[field] === null || body[field] === undefined ? null : toBoolean(body[field]));
       } else if (field === 'currentTutorId' || field === 'ownerId') {
         values.push(nextCurrentTutorId ?? null);
       } else {

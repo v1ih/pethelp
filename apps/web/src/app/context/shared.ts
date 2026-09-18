@@ -12,6 +12,8 @@ export interface Pet {
   photo: string | null;
   allergies: string[] | null;
   conditions: string[] | null;
+  sex?: string | null;
+  neutered?: boolean | null;
   linkedClinicId?: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -29,6 +31,8 @@ export type PetMutationPayload = {
   photo?: string | null;
   allergies?: string[] | null;
   conditions?: string[] | null;
+  sex?: string | null;
+  neutered?: boolean | null;
   isActive?: boolean;
   linkedClinicId?: string | null;
 };
@@ -353,6 +357,8 @@ export function normalizePetFromApi(pet: any): Pet {
     photo: pet.photo ?? null,
     allergies: parsePetArray(pet.allergies),
     conditions: parsePetArray(pet.conditions),
+    sex: pet.sex ?? null,
+    neutered: typeof pet.neutered === 'boolean' ? pet.neutered : null,
     linkedClinicId: pet.linkedClinicId ?? null,
     isActive: Boolean(pet.isActive ?? pet.is_active ?? false),
     createdAt: pet.createdAt ?? pet.created_at,

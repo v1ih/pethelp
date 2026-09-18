@@ -89,7 +89,7 @@ export default function PetProfileScreen() {
                 )}
               </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Idade</p>
                   <p className="mt-1 text-sm text-foreground">{currentPet.age || 'Não informada'}</p>
@@ -97,6 +97,14 @@ export default function PetProfileScreen() {
                 <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Peso</p>
                   <p className="mt-1 text-sm text-foreground">{currentPet.weight || 'Não informado'}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Sexo</p>
+                  <p className="mt-1 text-sm text-foreground">{currentPet.sex || 'Não informado'}</p>
+                </div>
+                <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Castrado(a)</p>
+                  <p className="mt-1 text-sm text-foreground">{currentPet.neutered === true ? 'Sim' : currentPet.neutered === false ? 'Não' : 'Não informado'}</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Alergias</p>

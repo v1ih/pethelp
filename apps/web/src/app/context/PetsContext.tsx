@@ -105,6 +105,8 @@ export function PetsProvider({ children }: { children: ReactNode }) {
           photo: pet.photo || null,
           allergies: pet.allergies ?? null,
           conditions: pet.conditions ?? null,
+          sex: pet.sex ?? null,
+          neutered: pet.neutered ?? null,
           isActive: pet.isActive,
         };
 
