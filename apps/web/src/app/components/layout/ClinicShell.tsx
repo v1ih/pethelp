@@ -80,7 +80,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(127,162,106,0.12),_transparent_34%),linear-gradient(180deg,_#fbfaf5_0%,_#ffffff_100%)] text-foreground">
+    <div className="min-h-screen bg-[var(--page-background)] text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-card/92 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <button
