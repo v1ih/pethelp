@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Calendar, CalendarDays, CalendarPlus, Clock, LayoutList, Lock, Mail, MessageSquare, PenLine, Plus, Star, Trash2, X } from 'lucide-react';
+import { Calendar, CalendarDays, CalendarPlus, Clock, LayoutList, Lock, Mail, MessageCircle, MessageSquare, PenLine, Plus, Star, Trash2, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useInteraction } from '../context/InteractionContext';
@@ -752,11 +752,23 @@ export default function AppointmentsScreen() {
                       <p className="mb-1 text-foreground">{appointment.petName}</p>
                       <p className="text-sm text-muted-foreground">{appointment.reason}</p>
                       <p className="mt-1 text-sm text-muted-foreground">{appointment.veterinarianName || appointment.clinicName}</p>
-                      {appointment.veterinarianEmail && (
-                        <a href={`mailto:${appointment.veterinarianEmail}`} className="mt-3 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted">
-                          <Mail className="h-3.5 w-3.5" />Contato direto
-                        </a>
-                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {appointment.veterinarianEmail && (
+                          <a href={`mailto:${appointment.veterinarianEmail}`} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted">
+                            <Mail className="h-3.5 w-3.5" />Contato direto
+                          </a>
+                        )}
+                        {appointment.veterinarianPhone && (
+                          <a
+                            href={`https://wa.me/${(() => { const d = String(appointment.veterinarianPhone).replace(/\D/g, ''); return d.startsWith('55') ? d : `55${d}`; })()}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-300"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5" />WhatsApp
+                          </a>
+                        )}
+                      </div>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         {review ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary"><MessageSquare className="h-3.5 w-3.5" />Avaliação registrada</span>
