@@ -5,12 +5,12 @@ type AppThemeProviderProps = React.PropsWithChildren<{
   defaultTheme?: string;
 }>;
 
-export function AppThemeProvider({ children, defaultTheme = 'system' }: AppThemeProviderProps) {
+export function AppThemeProvider({ children, defaultTheme = 'light' }: AppThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
       defaultTheme={defaultTheme}
-      enableSystem
+      enableSystem={false}
       disableTransitionOnChange
     >
       {children}

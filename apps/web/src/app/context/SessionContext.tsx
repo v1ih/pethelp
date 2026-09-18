@@ -111,13 +111,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const data = await resp.json();
     const { id, token, userType: apiUserType } = data;
+
+    const uiUserType = mapApiUserTypeToUi(apiUserType ?? userType);
+
+    // Garante que o perfil escolhido na tela corresponde ao tipo real da conta.
+    // Sem isso, escolher "Veterinário" e entrar com um e-mail de responsável
+    // logava no perfil errado silenciosamente.
+    if (uiUserType !== userType) {
+      const labels: Record<UserType, string> = {
+        owner: 'Responsável pelo animal',
+        veterinarian: 'Veterinário',
+        clinic: 'Clínica',
+      };
+      throw new Error(`Esta conta é do tipo "${labels[uiUserType]}". Selecione esse perfil para entrar.`);
+    }
+
     localStorage.setItem('token', token);
 
     const profileResp = await fetch(`${API_BASE}/api/users/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    const uiUserType = mapApiUserTypeToUi(apiUserType ?? userType);
 
     if (profileResp.ok) {
       const { data: profile } = await profileResp.json();

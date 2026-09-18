@@ -113,6 +113,8 @@ export default function LoginScreen() {
         text = 'Não foi possível falar com o servidor. Verifique se o backend está rodando.';
       } else if (/inactive|inativ/i.test(raw)) {
         text = 'Esta conta está inativa.';
+      } else if (/tipo|perfil/i.test(raw)) {
+        text = raw; // "Esta conta é do tipo ... Selecione esse perfil para entrar."
       }
       setLoginMessage({ type: 'error', text });
     } finally {

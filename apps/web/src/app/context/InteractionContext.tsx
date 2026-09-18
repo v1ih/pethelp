@@ -9,6 +9,7 @@ interface InteractionContextValue {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id'>) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
 }
 
 const InteractionContext = createContext<InteractionContextValue | undefined>(undefined);
@@ -246,6 +247,19 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item)));
   };
 
+  const deleteNotification = async (id: string) => {
+    const resp = await fetch(`${API_BASE}/api/notifications/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!resp.ok && resp.status !== 204) {
+      throw new Error((await resp.json().catch(() => null))?.message ?? 'Delete notification failed');
+    }
+
+    setNotifications((prev) => prev.filter((item) => item.id !== id));
+  };
+
   return (
     <InteractionContext.Provider
       value={{
@@ -255,6 +269,7 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
         notifications,
         addNotification,
         markNotificationAsRead,
+        deleteNotification,
       }}
     >
       {children}

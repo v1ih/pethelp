@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { useNavigate } from 'react-router';
 import { useState } from 'react';
-import { Bell, Calendar, Link as LinkIcon, Syringe } from 'lucide-react';
+import { Bell, Calendar, Link as LinkIcon, Syringe, Trash2 } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { TutorShell } from '../components/layout/TutorShell';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
@@ -12,9 +12,11 @@ import { useAppNavigation } from '../navigation';
 function NotificationsList({
   notifications,
   onMarkRead,
+  onDelete,
 }: {
   notifications: Array<{ id: string; type: string; title: string; message: string; date: string; read: boolean }>;
   onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const unread = notifications.filter((notification) => !notification.read);
   const read = notifications.filter((notification) => notification.read);
@@ -48,22 +50,32 @@ function NotificationsList({
           <h2 className="mb-4 text-2xl font-medium text-foreground">Novas</h2>
           <div className="space-y-3">
             {unread.map((notification) => (
-              <button
-                key={notification.id}
-                onClick={() => onMarkRead(notification.id)}
-                className="w-full rounded-[24px] border border-primary/20 bg-primary/10 p-4 text-left transition-colors hover:bg-primary/15"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/20">
-                    {getIcon(notification.type)}
+              <div key={notification.id} className="flex items-stretch gap-2">
+                <button
+                  onClick={() => onMarkRead(notification.id)}
+                  className="flex-1 rounded-[24px] border border-primary/20 bg-primary/10 p-4 text-left transition-colors hover:bg-primary/15"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/20">
+                      {getIcon(notification.type)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="mb-1 text-foreground">{notification.title}</p>
+                      <p className="mb-2 text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground">{notification.date}</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="mb-1 text-foreground">{notification.title}</p>
-                    <p className="mb-2 text-sm text-muted-foreground">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground">{notification.date}</p>
-                  </div>
-                </div>
-              </button>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDelete(notification.id)}
+                  aria-label="Excluir notificação"
+                  title="Excluir"
+                  className="shrink-0 rounded-2xl border border-border bg-card px-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -74,17 +86,28 @@ function NotificationsList({
           <h2 className="mb-4 text-2xl font-medium text-foreground">Anteriores</h2>
           <div className="space-y-3">
             {read.map((notification) => (
-              <div key={notification.id} className="rounded-[24px] border border-border bg-muted/25 p-4 opacity-70">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
-                    {getIcon(notification.type)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="mb-1 text-foreground">{notification.title}</p>
-                    <p className="mb-2 text-sm text-muted-foreground">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground">{notification.date}</p>
+              <div key={notification.id} className="flex items-stretch gap-2">
+                <div className="flex-1 rounded-[24px] border border-border bg-muted/25 p-4 opacity-70">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted">
+                      {getIcon(notification.type)}
+                    </div>
+                    <div className="flex-1">
+                      <p className="mb-1 text-foreground">{notification.title}</p>
+                      <p className="mb-2 text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground">{notification.date}</p>
+                    </div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onDelete(notification.id)}
+                  aria-label="Excluir notificação"
+                  title="Excluir"
+                  className="shrink-0 rounded-2xl border border-border bg-card px-3 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -97,7 +120,7 @@ function NotificationsList({
 export default function NotificationsScreen() {
   const navigate = useNavigate();
   const { user } = useSession();
-  const { notifications, markNotificationAsRead } = useInteraction();
+  const { notifications, markNotificationAsRead, deleteNotification } = useInteraction();
   const { confirmAndLogout } = useAppNavigation();
 
   const currentUserType = user?.userType ?? 'owner';
@@ -126,7 +149,7 @@ export default function NotificationsScreen() {
   if (currentUserType === 'veterinarian') {
     return (
       <VeterinarianShell active="dashboard" title="Notificações" description="Alertas e histórico de mensagens do sistema." actions={pushAction}>
-        <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} />
+        <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} onDelete={(id)=>void deleteNotification(id)} />
       </VeterinarianShell>
     );
   }
@@ -170,7 +193,7 @@ export default function NotificationsScreen() {
         </section>
 
         <div className="mt-6">
-          <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} />
+          <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} onDelete={(id)=>void deleteNotification(id)} />
         </div>
       </ClinicShell>
     );
@@ -178,7 +201,7 @@ export default function NotificationsScreen() {
 
   return (
     <TutorShell active="home" title="Notificações" description="Alertas e histórico de mensagens do sistema." actions={pushAction}>
-      <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} />
+      <NotificationsList notifications={userNotifications} onMarkRead={markNotificationAsRead} onDelete={(id)=>void deleteNotification(id)} />
     </TutorShell>
   );
 }

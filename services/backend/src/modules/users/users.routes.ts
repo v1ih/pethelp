@@ -367,9 +367,12 @@ async function deleteCurrentUserHandler(req: AuthRequest, res: any, next: any, u
     res.status(204).send();
   } catch (err: any) {
     await connection.rollback();
-    if (err?.code === 'ER_ROW_IS_REFERENCED_2') {
+    // Postgres emite 23503 (foreign_key_violation); o código ER_* é do MySQL e
+    // nunca chega aqui — mantido só por compatibilidade com a fachada antiga.
+    if (err?.code === '23503' || err?.code === 'ER_ROW_IS_REFERENCED_2') {
       res.status(409).json({
-        message: 'Cannot delete account while it is referenced by other records',
+        message:
+          'Não é possível excluir a conta porque ela possui histórico vinculado (consultas, prontuários ou avaliações). Use "Desativar conta" para encerrar o acesso preservando o histórico.',
       });
       return;
     }

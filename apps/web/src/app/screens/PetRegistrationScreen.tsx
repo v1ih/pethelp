@@ -94,6 +94,19 @@ export default function PetRegistrationScreen() {
             <div className="mb-4 flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-border bg-muted">
               {photo ? <img src={photo} alt="Pet" className="h-full w-full object-cover" /> : <Camera className="h-12 w-12 text-muted-foreground" />}
             </div>
+            {photo ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPhoto('');
+                  const input = document.getElementById('photo') as HTMLInputElement | null;
+                  if (input) input.value = '';
+                }}
+                className="mb-3 text-sm text-destructive underline underline-offset-2 hover:opacity-80"
+              >
+                Remover foto
+              </button>
+            ) : null}
             <div className="w-full">
               <label htmlFor="photo" className="mb-2 block text-center text-sm font-medium text-foreground">
                 Foto (opcional)
