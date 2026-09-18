@@ -148,6 +148,9 @@ export default function PetRegistrationScreen() {
           </div>
 
           <div className="grid gap-4">
+            <p className="rounded-[14px] border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
+              Apenas <span className="text-foreground">Nome</span> e <span className="text-foreground">Espécie</span> são obrigatórios. Os demais campos são opcionais.
+            </p>
             <div>
               <label htmlFor="petName" className="mb-2 block text-foreground">
                 Nome do Pet <span className="text-destructive">*</span>

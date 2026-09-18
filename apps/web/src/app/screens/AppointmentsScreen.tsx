@@ -716,7 +716,6 @@ export default function AppointmentsScreen() {
 
               <div className={`rounded-[22px] border px-4 py-3 text-sm ${availability.isAvailable === false ? 'border-amber-200 bg-amber-50 text-amber-800' : availability.isAvailable ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-border bg-muted/20 text-muted-foreground'}`}>
                 <p>{availability.loading ? 'Verificando disponibilidade...' : availability.message}</p>
-                {availability.busyTimes.length > 0 ? <p className="mt-1 text-xs">Horários ocupados: {availability.busyTimes.join(', ')}</p> : null}
               </div>
 
               <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-[18px] bg-primary py-3 text-white transition-colors hover:bg-primary/90">
