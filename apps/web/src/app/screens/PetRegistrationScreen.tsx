@@ -13,6 +13,8 @@ export default function PetRegistrationScreen() {
   const isEditing = location.state?.mode === 'edit' && !!selectedPet;
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('');
+  // Seletor de espécie: 'Cachorro' | 'Gato' | 'Outro' (com campo livre) | ''
+  const [speciesMode, setSpeciesMode] = useState('');
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [weight, setWeight] = useState('');
@@ -31,6 +33,7 @@ export default function PetRegistrationScreen() {
     if (!isEditing || !selectedPet) {
       setName('');
       setSpecies('');
+      setSpeciesMode('');
       setAge('');
       setBreed('');
       setWeight('');
@@ -42,6 +45,7 @@ export default function PetRegistrationScreen() {
 
     setName(selectedPet.name);
     setSpecies(selectedPet.species || '');
+    setSpeciesMode(selectedPet.species ? (['Cachorro', 'Gato'].includes(selectedPet.species) ? selectedPet.species : 'Outro') : '');
     // Idade/peso são guardados como "3 anos"/"25 kg"; no formulário editamos só o número.
     setAge((selectedPet.age || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
     setBreed(selectedPet.breed || '');
@@ -155,7 +159,33 @@ export default function PetRegistrationScreen() {
               <label htmlFor="species" className="mb-2 block text-foreground">
                 Espécie <span className="text-destructive">*</span>
               </label>
-              <input type="text" id="species" value={species} onChange={(e) => setSpecies(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Cachorro, Gato, etc." required />
+              <select
+                id="species"
+                value={speciesMode}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSpeciesMode(value);
+                  setSpecies(value === 'Outro' ? '' : value);
+                }}
+                className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+                required
+              >
+                <option value="" disabled>Selecione…</option>
+                <option value="Cachorro">Cachorro</option>
+                <option value="Gato">Gato</option>
+                <option value="Outro">Outro</option>
+              </select>
+              {speciesMode === 'Outro' && (
+                <input
+                  type="text"
+                  aria-label="Qual espécie?"
+                  value={species}
+                  onChange={(e) => setSpecies(e.target.value)}
+                  className="mt-2 w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+                  placeholder="Qual espécie?"
+                  required
+                />
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
