@@ -24,3 +24,6 @@ Thumbs.db
 
 # IDE files
 /Guias/
+
+# Build local da Vercel CLI (nunca versionar)
+.vercel/
