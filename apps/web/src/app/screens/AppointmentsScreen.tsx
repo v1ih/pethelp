@@ -887,9 +887,17 @@ export default function AppointmentsScreen() {
                     <div className="flex flex-col items-end gap-2 text-right">
                       <p className="text-foreground">{appointment.date}</p>
                       <p className="text-sm text-muted-foreground">{appointment.time}</p>
-                      {user?.userType === 'owner' && appointment.veterinarianId && (
-                        <button onClick={() => openReview(appointment.id)} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-foreground transition-colors hover:bg-muted">
-                          <PenLine className="h-3.5 w-3.5" />{review ? 'Editar avaliação' : 'Avaliar'}
+                      {user?.userType === 'owner' && (appointment.veterinarianId || appointment.clinicId) && (
+                        <button
+                          onClick={() => openReview(appointment.id)}
+                          className={
+                            review
+                              ? 'inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10'
+                              : 'inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90'
+                          }
+                        >
+                          {review ? <PenLine className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                          {review ? 'Editar avaliação' : 'Avaliar atendimento'}
                         </button>
                       )}
                     </div>

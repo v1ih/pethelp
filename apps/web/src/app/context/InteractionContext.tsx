@@ -152,7 +152,7 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
         sourceKey: `appointment-created:${created.id}`,
         type: 'appointment',
         title: 'Consulta agendada',
-        message: `${created.petName} foi agendado para ${created.date} �s ${created.time}.`,
+        message: `${created.petName} foi agendado para ${created.date} às ${created.time}.`,
         date: new Date().toISOString().slice(0, 10),
       }),
     });
@@ -195,10 +195,10 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
         appointmentId: updated.id,
         sourceKey,
         type: 'appointment',
-        title: 'Atualiza��o de consulta',
+        title: 'Atualização de consulta',
         message:
           updated.status === 'completed'
-            ? `${updated.petName} teve a consulta conclu�da.`
+            ? `${updated.petName} teve a consulta concluída.`
             : updated.status === 'cancelled'
               ? `${updated.petName} teve a consulta cancelada.`
               : `${updated.petName} teve a consulta atualizada.`,

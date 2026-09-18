@@ -379,27 +379,34 @@ export function encodeExamDocument(document: ExamDocument) {
   return JSON.stringify(document);
 }
 
-export function decodeExamDocument(value: string): ExamDocument | null {
-  try {
-    const parsed = JSON.parse(value) as Partial<ExamDocument>;
-    if (
-      typeof parsed.name === 'string' &&
-      typeof parsed.type === 'string' &&
-      typeof parsed.size === 'number' &&
-      typeof parsed.dataUrl === 'string'
-    ) {
-      return {
-        name: parsed.name,
-        type: parsed.type,
-        size: parsed.size,
-        dataUrl: parsed.dataUrl,
-      };
+export function decodeExamDocument(value: unknown): ExamDocument | null {
+  // Aceita tanto uma string JSON (formato antigo) quanto um objeto já pronto
+  // (como o Vet-Pass guarda os anexos), pra não quebrar nenhum dos dois casos.
+  let parsed: any = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
     }
-
-    return null;
-  } catch {
-    return null;
   }
+
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    typeof parsed.name === 'string' &&
+    typeof parsed.type === 'string' &&
+    typeof parsed.dataUrl === 'string'
+  ) {
+    return {
+      name: parsed.name,
+      type: parsed.type,
+      size: typeof parsed.size === 'number' ? parsed.size : 0,
+      dataUrl: parsed.dataUrl,
+    };
+  }
+
+  return null;
 }
 
 export function normalizeVaccineFromApi(vaccine: any): Vaccine {
