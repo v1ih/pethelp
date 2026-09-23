@@ -142,7 +142,7 @@ export default function OnboardingModal({ open, userType, onClose }: OnboardingM
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-xs text-foreground transition-colors hover:bg-muted"
           >
             {isLast ? 'Fechar' : 'Pular'}
             <X className="h-3.5 w-3.5" />

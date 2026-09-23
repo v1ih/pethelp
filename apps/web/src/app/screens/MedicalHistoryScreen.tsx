@@ -392,7 +392,7 @@ export default function MedicalHistoryScreen() {
         )}
 
         {petRecords.length === 0 ? (
-          <div className="rounded-[34px] border border-border/70 bg-card p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+          <div className="rounded-[34px] border border-border/70 bg-card p-5 sm:p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
             <p className="text-muted-foreground">Nenhum evento médico registrado para este pet.</p>
           </div>
         ) : (

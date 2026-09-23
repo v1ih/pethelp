@@ -16,6 +16,22 @@ CREATE TABLE IF NOT EXISTS email_codes (
   expires_at TIMESTAMP NOT NULL, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_email_codes_lookup ON email_codes (email, purpose);
+-- E-mails agora são sempre guardados em minúsculas. No PostgreSQL "=" diferencia
+-- maiúsculas, então contas gravadas como "Ana@Gmail.com" nunca eram encontradas pelas
+-- rotas que normalizam o e-mail (verificação/reenvio), e o aviso voltava a pedir o código.
+UPDATE users u SET email = LOWER(u.email)
+  WHERE u.email <> LOWER(u.email)
+    AND NOT EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND o.email = LOWER(u.email));
+UPDATE email_codes SET email = LOWER(email) WHERE email <> LOWER(email);
+-- Impede novas contas duplicadas que só diferem por maiúsculas. Se o banco já tiver
+-- duplicatas, o índice é ignorado (o cadastro já bloqueia o caso pela busca normalizada).
+DO $$ BEGIN
+  BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_lower ON users (LOWER(email));
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'E-mails duplicados por maiuscula/minuscula: indice unico nao criado.';
+  END;
+END $$;
 CREATE TABLE IF NOT EXISTS tutors (
   id UUID PRIMARY KEY, user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL, phone VARCHAR(30), cpf VARCHAR(14) UNIQUE,

@@ -34,7 +34,7 @@ export default function ConnectionScreen() {
   return (
     <TutorShell active="connection" title="Vincular à clínica" description={`Conecte ${currentPet?.name || 'seu pet'} usando o código fornecido pela clínica.`}>
       {success ? (
-        <div className="mx-auto max-w-2xl rounded-[34px] border border-border/70 bg-card p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+        <div className="mx-auto max-w-2xl rounded-[34px] border border-border/70 bg-card p-5 sm:p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Check className="h-10 w-10" />
           </div>

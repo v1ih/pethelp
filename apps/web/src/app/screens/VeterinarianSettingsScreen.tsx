@@ -285,7 +285,7 @@ export default function VeterinarianSettingsScreen() {
 
   return (    <VeterinarianShell active="settings" title="Configurações" description="Dados profissionais, idioma e segurança da conta.">
 
-        <section className="rounded-[28px] border border-border/60 bg-card p-8 shadow-lg">
+        <section className="rounded-[28px] border border-border/60 bg-card p-5 sm:p-8 shadow-lg">
           {feedback && (
             <div
               className={`mb-6 rounded-2xl border px-4 py-3 text-sm ${
@@ -401,13 +401,13 @@ export default function VeterinarianSettingsScreen() {
           </form>
         </section>
 
-        <section className="mt-6 rounded-[28px] border border-border bg-card p-8 shadow-lg">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+        <section className="mt-6 rounded-[28px] border border-border bg-card p-5 sm:p-8 shadow-lg">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
                 <Link2 className="h-7 w-7 text-primary" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-2xl text-foreground">Vínculos institucionais</h2>
                 <p className="text-muted-foreground">Agora gerenciados na aba Vínculos do menu lateral.</p>
               </div>
@@ -415,7 +415,7 @@ export default function VeterinarianSettingsScreen() {
             <button
               type="button"
               onClick={() => navigate('/veterinarian-links')}
-              className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90"
+              className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90 sm:w-auto"
             >
               <Link2 className="h-4 w-4" />
               Abrir vínculos
@@ -429,7 +429,7 @@ export default function VeterinarianSettingsScreen() {
 
         <PermissionsSection />
 
-        <section className="mt-6 rounded-[28px] border border-red-200 bg-red-50/70 p-8">
+        <section className="mt-6 rounded-[28px] border border-red-200 bg-red-50/70 p-5 sm:p-8">
           <div className="flex items-center gap-4 mb-6">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100">
               <ShieldAlert className="h-7 w-7 text-red-600" />

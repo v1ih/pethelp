@@ -7,6 +7,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import OwnerDashboardScreen from './screens/OwnerDashboardScreen';
 import ClinicDashboardScreen from './screens/ClinicDashboardScreen';
 import ClinicAgendaScreen from './screens/ClinicAgendaScreen';
+import ClinicPetRegistrationScreen from './screens/ClinicPetRegistrationScreen';
 import ClinicHistoryScreen from './screens/ClinicHistoryScreen';
 import VeterinarianDashboardScreen from './screens/VeterinarianDashboardScreen';
 import VeterinarianScheduleScreen from './screens/VeterinarianScheduleScreen';
@@ -133,6 +134,10 @@ export const router = createBrowserRouter([
   {
     path: '/clinic-dashboard',
     Component: withAllowedUserTypes(ClinicDashboardScreen, ['clinic']),
+  },
+  {
+    path: '/clinic-pet-registration',
+    Component: withAllowedUserTypes(ClinicPetRegistrationScreen, ['clinic']),
   },
   {
     path: '/clinic-agenda',

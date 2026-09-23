@@ -68,24 +68,24 @@ export default function VeterinarianShell({ active, title, description, actions,
     <div className="min-h-screen bg-[var(--page-background)] text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-card/92 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <button type="button" onClick={() => navigate(dashboardPath)} className="flex items-center gap-3 text-left transition-opacity hover:opacity-90">
-            <img src="/icon.png" alt="PetHelp" className="h-11 w-11 object-contain" />
+          <button type="button" onClick={() => navigate(dashboardPath)} className="flex min-w-0 items-center gap-2 text-left transition-opacity hover:opacity-90 sm:gap-3">
+            <img src="/icon.png" alt="PetHelp" className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11" />
             <div>
               <p className="text-[19px] font-medium leading-none">PetHelp</p>
-              <p className="mt-1 text-sm text-muted-foreground">Cuidado veterinário conectado</p>
+              <p className="mt-1 hidden text-sm text-muted-foreground sm:block">Cuidado veterinário conectado</p>
             </div>
           </button>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
             <div className="hidden text-right md:block">
               <p className="text-sm text-muted-foreground">Olá, {veterinarianName}</p>
             </div>
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Veterinário</span>
+            <span className="hidden rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary sm:inline-flex">Veterinário</span>
             <ThemeToggle />
             <button
               type="button"
               onClick={openHelp}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted sm:h-11 sm:w-11"
               aria-label="Ajuda e tutorial"
               title="Ajuda e tutorial"
             >
@@ -94,7 +94,7 @@ export default function VeterinarianShell({ active, title, description, actions,
             <button
               type="button"
               onClick={() => navigate('/veterinarian-notifications')}
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted sm:h-11 sm:w-11"
               aria-label="Notificações"
               title="Notificações"
             >
@@ -104,7 +104,7 @@ export default function VeterinarianShell({ active, title, description, actions,
             <button
               type="button"
               onClick={() => navigate(settingsPath)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              className="hidden h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted sm:inline-flex sm:h-11 sm:w-11"
               aria-label="Configurações"
               title="Configurações"
             >
@@ -113,7 +113,7 @@ export default function VeterinarianShell({ active, title, description, actions,
             <button
               type="button"
               onClick={() => confirmAndLogout()}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted sm:h-11 sm:w-11"
               aria-label="Sair"
               title="Sair"
             >
@@ -133,13 +133,13 @@ export default function VeterinarianShell({ active, title, description, actions,
         </aside>
 
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+          <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden">
             {navItems.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => navigate(item.path)}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors ${
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors ${
                   active === item.key ? 'border-primary bg-primary text-white' : 'border-border bg-card text-foreground hover:bg-muted'
                 }`}
               >

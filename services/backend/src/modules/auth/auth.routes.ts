@@ -66,7 +66,9 @@ router.post('/register', async (req, res, next) => {
 
   try {
     const body = req.body ?? {};
-    const email = asTrimmedString(body.email);
+    // Sempre em minúsculas: no PostgreSQL "=" diferencia maiúsculas, então guardar
+    // "Ana@Gmail.com" faz a verificação de e-mail (que normaliza) nunca achar a conta.
+    const email = normalizeEmail(body.email);
     const password = asTrimmedString(body.password);
     const userType = normalizeUserType(body.userType);
     const name = asTrimmedString(body.name);
@@ -190,13 +192,14 @@ router.post('/register', async (req, res, next) => {
 
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body ?? {};
+    const email = normalizeEmail(req.body?.email);
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
     if (!email || !password) {
       res.status(400).json({ message: 'email and password are required' });
       return;
     }
 
-    const user = await findUserByEmail(String(email));
+    const user = await findUserByEmail(email);
     if (!user) {
       res.status(401).json({ message: 'Invalid credentials' });
       return;

@@ -121,7 +121,7 @@ export default function VaccinationScreen() {
         )}
 
         {petVaccines.length === 0 ? (
-          <div className="rounded-[34px] border border-border/70 bg-card p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
+          <div className="rounded-[34px] border border-border/70 bg-card p-5 sm:p-8 text-center shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)]">
             <p className="text-muted-foreground">Nenhuma vacina registrada para este pet.</p>
           </div>
         ) : (

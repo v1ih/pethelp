@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { CalendarDays, CheckCircle2, ClipboardList, Copy, Link2, MessageSquare, ShieldAlert, Star, Stethoscope, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ClipboardList, Copy, Link2, MessageSquare, PawPrint, ShieldAlert, Star, Stethoscope, Users } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { useInteraction } from '../context/InteractionContext';
 import { useReviews } from '../context/ReviewsContext';
@@ -125,8 +125,16 @@ export default function ClinicDashboardScreen() {
         <>
           <button
             type="button"
+            onClick={() => navigate('/clinic-pet-registration')}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90 sm:w-auto"
+          >
+            <PawPrint className="h-5 w-5" />
+            Cadastrar pet
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/clinic-veterinarians')}
-            className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted sm:w-auto"
           >
             <Users className="h-5 w-5" />
             Gerenciar veterinários
@@ -134,7 +142,7 @@ export default function ClinicDashboardScreen() {
           <button
             type="button"
             onClick={() => navigate('/clinic-agenda')}
-            className="inline-flex items-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted sm:w-auto"
           >
             <CalendarDays className="h-5 w-5" />
             Abrir agenda
@@ -167,22 +175,22 @@ export default function ClinicDashboardScreen() {
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_auto]">
-              <div className="rounded-[28px] border border-primary/15 bg-primary/5 px-5 py-5">
+              <div className="min-w-0 rounded-[28px] border border-primary/15 bg-primary/5 px-4 py-5 sm:px-5">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <Link2 className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">Código da clínica</p>
                     <p className="mt-1 text-sm text-muted-foreground">Compartilhe com veterinários para solicitar vínculo direto com a sua clínica.</p>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div className="rounded-[22px] border border-dashed border-border bg-card px-4 py-4 font-mono text-lg tracking-[0.28em] text-foreground">
+                      <div className="min-w-0 break-all rounded-[22px] border border-dashed border-border bg-card px-3 py-3 text-center font-mono text-base tracking-[0.16em] text-foreground sm:px-4 sm:py-4 sm:text-lg sm:tracking-[0.28em]">
                         {connectionCode || 'Sem código disponível'}
                       </div>
                       <button
                         type="button"
                         onClick={handleCopyConnectionCode}
-                        className="inline-flex items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90"
+                        className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[18px] bg-primary px-4 py-3 text-white transition-colors hover:bg-primary/90"
                       >
                         <Copy className="h-4 w-4" />
                         {copyFeedback ? 'Copiado' : 'Copiar'}
@@ -192,7 +200,7 @@ export default function ClinicDashboardScreen() {
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-border bg-background p-5">
+              <div className="min-w-0 rounded-[28px] border border-border bg-background p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm text-muted-foreground">Média geral</p>

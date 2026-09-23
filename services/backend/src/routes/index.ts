@@ -11,6 +11,7 @@ import notificationsRouter from '../modules/notifications/notifications.routes.j
 import reviewsRouter from '../modules/reviews/reviews.routes.js';
 import vetPassesRouter from '../modules/vet-passes/vet-passes.routes.js';
 import remindersRouter from '../modules/internal/reminders.routes.js';
+import clinicRegistrationsRouter from '../modules/clinic-registrations/clinic-registrations.routes.js';
 
 export const apiRouter = Router();
 
@@ -22,6 +23,7 @@ apiRouter.use('/appointments', appointmentsRouter);
 apiRouter.use('/medical-records', medicalHistoryRouter);
 apiRouter.use('/vaccines', vaccinesRouter);
 apiRouter.use('/clinic-links', clinicLinksRouter);
+apiRouter.use('/clinic-registrations', clinicRegistrationsRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/reviews', reviewsRouter);
 apiRouter.use('/vet-passes', vetPassesRouter);

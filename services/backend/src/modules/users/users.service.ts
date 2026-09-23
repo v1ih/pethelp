@@ -347,7 +347,7 @@ export async function updateVeterinarianProfile(userId: string, input: UpdateVet
 }
 
 export async function findUserByEmail(email: string) {
-  const [rows] = await pool.query<AuthUserRow[]>(`SELECT * FROM users WHERE email = ? LIMIT 1`, [email]);
+  const [rows] = await pool.query<AuthUserRow[]>(`SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1`, [email]);
   return rows.length ? rows[0] : null;
 }
 
