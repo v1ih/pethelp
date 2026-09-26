@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Check, ClipboardCheck, Copy, Mail, PawPrint, UserPlus } from 'lucide-react';
+import { Check, ClipboardCheck, Copy, Mail, PawPrint, ShieldCheck, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { getApiBase, getAuthHeaders } from '../context/shared';
@@ -15,6 +15,10 @@ type RegistrationResult = {
     name: string;
     email: string;
     isNewAccount: boolean;
+  };
+  vetPass: {
+    code: string;
+    expiresAt: string;
   };
   summaryEmailSent: boolean;
   inviteEmailSent: boolean;
@@ -174,8 +178,15 @@ export default function ClinicPetRegistrationScreen() {
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                 {result.summaryEmailSent
-                  ? 'Resumo dos dados enviado por e-mail.'
+                  ? 'Resumo dos dados e aviso do compartilhamento enviados por e-mail.'
                   : 'E-mail não configurado no servidor: repasse as informações ao responsável.'}
+              </li>
+              <li className="flex items-start gap-2">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                Vet-Pass <strong className="font-mono">{result.vetPass.code}</strong> criado: a clínica acompanha
+                prontuário, vacinas e exames até{' '}
+                {new Date(result.vetPass.expiresAt).toLocaleDateString('pt-BR')}. O responsável vê esse
+                compartilhamento em "Compartilhamentos" e pode encerrá-lo quando quiser.
               </li>
               {result.tutor.isNewAccount ? (
                 <li className="flex items-start gap-2">
@@ -226,10 +237,10 @@ export default function ClinicPetRegistrationScreen() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/clinic-dashboard')}
+              onClick={() => navigate('/clinic-pets')}
               className="inline-flex min-h-12 w-full items-center justify-center rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted sm:w-auto"
             >
-              Voltar ao painel
+              Ver pets cadastrados
             </button>
           </div>
         </div>

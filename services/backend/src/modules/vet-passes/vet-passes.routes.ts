@@ -142,11 +142,12 @@ router.get('/me', async (req: AuthRequest, res, next) => {
       `
         SELECT
           vp.*,
-          v.name AS redeemed_name,
+          COALESCE(v.name, c.trade_name) AS redeemed_name,
           u.email AS redeemed_email
         FROM vet_passes vp
         LEFT JOIN users u ON u.id = vp.redeemed_by_user_id
         LEFT JOIN veterinarians v ON v.user_id = vp.redeemed_by_user_id
+        LEFT JOIN clinics c ON c.user_id = vp.redeemed_by_user_id
         WHERE vp.tutor_id = ?
         ORDER BY vp.created_at DESC
       `,

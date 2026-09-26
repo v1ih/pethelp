@@ -1,10 +1,12 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle, Camera, Download, Eye } from 'lucide-react';
+import { toast } from 'sonner';
 import { useHealth } from '../context/HealthContext';
 import { usePets } from '../context/PetsContext';
 import { useAppNavigation } from '../navigation';
 import { TutorShell } from '../components/layout/TutorShell';
+import { fileToCompressedDataUrl } from '../utils/image';
 
 export default function VaccinationScreen() {
   const navigate = useNavigate();
@@ -20,6 +22,10 @@ export default function VaccinationScreen() {
   const [nextDose, setNextDose] = useState('');
   const [veterinarian, setVeterinarian] = useState('');
   const [clinicName, setClinicName] = useState('');
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  // Vacina cuja foto está aberta em tela cheia.
+  const [photoInView, setPhotoInView] = useState<{ name: string; photo: string } | null>(null);
 
   if (!currentPet) {
     return (
@@ -41,7 +47,24 @@ export default function VaccinationScreen() {
     setNextDose('');
     setVeterinarian('');
     setClinicName('');
+    setPhoto(null);
     setShowForm(false);
+  };
+
+  const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Limpa o input para permitir escolher o mesmo arquivo de novo depois de remover.
+    event.target.value = '';
+    if (!file) return;
+
+    setPhotoLoading(true);
+    try {
+      setPhoto(await fileToCompressedDataUrl(file));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível usar essa imagem.');
+    } finally {
+      setPhotoLoading(false);
+    }
   };
 
   const startCreate = () => {
@@ -56,6 +79,7 @@ export default function VaccinationScreen() {
     setNextDose(vaccine.nextDose || '');
     setVeterinarian(vaccine.veterinarian || '');
     setClinicName(vaccine.clinicName || '');
+    setPhoto(vaccine.photo ?? null);
     setShowForm(true);
   };
 
@@ -70,6 +94,8 @@ export default function VaccinationScreen() {
       nextDose: nextDose || undefined,
       veterinarian: veterinarian || undefined,
       clinicName: clinicName || undefined,
+      // Sempre enviado: null remove a foto de um registro que já tinha uma.
+      photo,
     };
 
     setSaving(true);
@@ -80,6 +106,8 @@ export default function VaccinationScreen() {
         await addVaccine({ petId: currentPet.id, ...payload });
       }
       clearForm();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível salvar a vacina.');
     } finally {
       setSaving(false);
     }
@@ -112,6 +140,53 @@ export default function VaccinationScreen() {
                 <label className="mb-2 block text-sm text-foreground">Clínica / Local de Aplicação (Opcional)</label>
                 <input type="text" value={clinicName} onChange={(e) => setClinicName(e.target.value)} placeholder="Ex: Clínica PetHelp" className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" />
               </div>
+
+              <div className="md:col-span-2">
+                <label htmlFor="vaccinePhoto" className="mb-2 block text-sm text-foreground">Foto da vacina ou da carteirinha (Opcional)</label>
+                {photo ? (
+                  <div className="flex flex-col gap-3 rounded-[18px] border border-border bg-input-background p-3 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoInView({ name: name || 'Foto da vacina', photo })}
+                      className="mx-auto shrink-0 overflow-hidden rounded-[14px] border border-border bg-background sm:mx-0"
+                      title="Ver foto em tamanho maior"
+                    >
+                      <img src={photo} alt="Foto da vacina" className="h-28 w-28 object-cover" />
+                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <label
+                        htmlFor="vaccinePhoto"
+                        className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[18px] border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                      >
+                        <Camera className="h-4 w-4" />
+                        Trocar foto
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setPhoto(null)}
+                        className="inline-flex min-h-11 items-center justify-center rounded-[18px] border border-border bg-background px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
+                      >
+                        Remover foto
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="vaccinePhoto"
+                    className="flex min-h-11 cursor-pointer flex-col items-center justify-center gap-1 rounded-[18px] border border-dashed border-border bg-input-background px-4 py-6 text-center text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                  >
+                    <Camera className="h-5 w-5" />
+                    {photoLoading ? 'Preparando imagem...' : 'Toque para tirar ou escolher uma foto'}
+                  </label>
+                )}
+                <input
+                  id="vaccinePhoto"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => void handlePhotoChange(event)}
+                />
+              </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={clearForm} className="rounded-[18px] border border-border bg-background px-4 py-3 text-muted-foreground transition-colors hover:bg-muted">Cancelar</button>
@@ -130,10 +205,21 @@ export default function VaccinationScreen() {
               <div key={vaccine.id} className="rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_18px_42px_-30px_rgba(127,162,106,0.2)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                      <Syringe className="h-5 w-5" />
-                    </div>
-                    <div>
+                    {vaccine.photo ? (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoInView({ name: vaccine.name, photo: vaccine.photo as string })}
+                        className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl border border-border bg-background transition-opacity hover:opacity-80"
+                        title={`Ver foto de ${vaccine.name}`}
+                      >
+                        <img src={vaccine.photo} alt={`Foto da vacina ${vaccine.name}`} className="h-full w-full object-cover" />
+                      </button>
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Syringe className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-lg text-foreground">{vaccine.name}</h3>
                         <span className={`rounded-full px-3 py-1 text-xs ${vaccine.status === 'late' ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'}`}>{vaccine.status === 'late' ? 'Atrasada' : 'Em dia'}</span>
@@ -144,9 +230,18 @@ export default function VaccinationScreen() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => startEdit(vaccine)} className="rounded-full border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-muted" title="Editar Vacina"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => { if (confirm(`Remover o registro da vacina ${vaccine.name}?`)) void deleteVaccine(vaccine.id); }} className="rounded-full border border-border bg-background p-2 text-red-600 transition-colors hover:bg-red-50" title="Excluir Vacina"><Trash2 className="h-4 w-4" /></button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {vaccine.photo ? (
+                      <button
+                        onClick={() => setPhotoInView({ name: vaccine.name, photo: vaccine.photo as string })}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver foto
+                      </button>
+                    ) : null}
+                    <button onClick={() => startEdit(vaccine)} className="rounded-full border border-border bg-background p-3 text-muted-foreground transition-colors hover:bg-muted" title="Editar Vacina"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => { if (confirm(`Remover o registro da vacina ${vaccine.name}?`)) void deleteVaccine(vaccine.id); }} className="rounded-full border border-border bg-background p-3 text-red-600 transition-colors hover:bg-red-50" title="Excluir Vacina"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </div>
@@ -154,6 +249,51 @@ export default function VaccinationScreen() {
           </div>
         )}
       </div>
+
+      {photoInView ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPhotoInView(null)}
+        >
+          <div
+            className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-card shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
+              <div className="min-w-0">
+                <h3 className="truncate text-lg text-foreground">{photoInView.name}</h3>
+                <p className="text-xs text-muted-foreground">Foto da vacina / carteirinha</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={photoInView.photo}
+                  download={`vacina-${photoInView.name.replace(/[^\w.-]+/g, '-').toLowerCase()}.jpg`}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm text-white transition-colors hover:bg-primary/90"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Baixar</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPhotoInView(null)}
+                  className="inline-flex min-h-11 items-center rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[80vh] overflow-auto bg-muted/30 p-3 sm:p-4">
+              <img
+                src={photoInView.photo}
+                alt={`Foto da vacina ${photoInView.name}`}
+                className="mx-auto max-h-[70vh] w-auto max-w-full rounded-[20px] border border-border bg-background object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </TutorShell>
   );
 }

@@ -18,6 +18,7 @@ type VaccineRow = RowDataPacket & {
   next_dose_date: Date | string | null;
   status: 'up-to-date' | 'late';
   added_by: 'tutor' | 'veterinarian' | 'clinic';
+  photo: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -26,6 +27,11 @@ type DbClient = Pick<PoolConnection, 'execute' | 'query'>;
 
 const router = Router();
 
+// A foto chega como data URL já reduzida pelo navegador. O limite protege o banco e a
+// resposta da listagem; ~4 milhões de caracteres equivalem a uma imagem de cerca de 3 MB.
+const MAX_PHOTO_CHARS = 4_000_000;
+const PHOTO_DATA_URL = /^data:image\/(png|jpe?g|webp|gif|heic|heif);base64,[A-Za-z0-9+/=\s]+$/i;
+
 function asTrimmedString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -33,6 +39,26 @@ function asTrimmedString(value: unknown) {
 function asNullableString(value: unknown) {
   const text = asTrimmedString(value);
   return text.length > 0 ? text : null;
+}
+
+type PhotoResult = { ok: true; value: string | null } | { ok: false; message: string };
+
+/** Valida a foto opcional da vacina/carteirinha. Vazio ou null removem a imagem. */
+function parsePhoto(value: unknown): PhotoResult {
+  if (value === null) return { ok: true, value: null };
+
+  const text = asTrimmedString(value);
+  if (!text) return { ok: true, value: null };
+
+  if (!PHOTO_DATA_URL.test(text)) {
+    return { ok: false, message: 'A foto precisa ser uma imagem (PNG, JPG, WEBP, GIF ou HEIC).' };
+  }
+
+  if (text.length > MAX_PHOTO_CHARS) {
+    return { ok: false, message: 'A foto ficou grande demais. Envie uma imagem menor.' };
+  }
+
+  return { ok: true, value: text };
 }
 
 function formatDate(value: Date | string | null) {
@@ -65,6 +91,7 @@ function normalizeVaccine(row: VaccineRow) {
     nextDose: formatDate(row.next_dose_date) ?? undefined,
     status: row.status,
     addedBy: row.added_by,
+    photo: row.photo ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -85,6 +112,7 @@ async function loadVaccineById(db: DbClient, vaccineId: string) {
         next_dose_date,
         status,
         added_by,
+        photo,
         created_at,
         updated_at
       FROM vaccines
@@ -121,6 +149,7 @@ router.get('/pet/:petId', async (req: AuthRequest, res, next) => {
           next_dose_date,
           status,
           added_by,
+          photo,
           created_at,
           updated_at
         FROM vaccines
@@ -158,6 +187,12 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    const photo = parsePhoto(body.photo);
+    if (!photo.ok) {
+      res.status(400).json({ message: photo.message });
+      return;
+    }
+
     const status = getComputedStatus(nextDose);
 
     await connection.beginTransaction();
@@ -174,8 +209,9 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
           status,
           veterinarian_name,
           clinic_name,
-          added_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          added_by,
+          photo
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         id,
@@ -187,6 +223,7 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
         veterinarian,
         clinicName,
         req.user?.userType ?? 'veterinarian',
+        photo.value,
       ]
     );
 
@@ -262,6 +299,17 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     if (body.clinicName !== undefined) {
       assignments.push('clinic_name = ?');
       values.push(asNullableString(body.clinicName));
+    }
+
+    // Enviar photo: null (ou string vazia) remove a foto do registro.
+    if (body.photo !== undefined) {
+      const photo = parsePhoto(body.photo);
+      if (!photo.ok) {
+        res.status(400).json({ message: photo.message });
+        return;
+      }
+      assignments.push('photo = ?');
+      values.push(photo.value);
     }
 
     if (assignments.length === 0) {

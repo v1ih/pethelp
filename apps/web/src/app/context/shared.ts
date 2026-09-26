@@ -67,6 +67,8 @@ export interface Vaccine {
   veterinarian?: string;
   clinicId?: string;
   clinicName?: string;
+  /** Foto opcional da vacina ou da carteirinha (data URL). */
+  photo?: string | null;
 }
 
 export interface Appointment {
@@ -426,6 +428,7 @@ export function normalizeVaccineFromApi(vaccine: any): Vaccine {
     veterinarian: vaccine.veterinarian ?? vaccine.veterinarianName ?? vaccine.veterinarian_name ?? undefined,
     clinicId: vaccine.clinicId ?? vaccine.clinic_id ?? undefined,
     clinicName: vaccine.clinicName ?? vaccine.clinic_name ?? undefined,
+    photo: vaccine.photo ?? null,
   };
 }
 

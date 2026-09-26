@@ -19,7 +19,7 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 
-type ClinicNavKey = 'dashboard' | 'registration' | 'veterinarians' | 'agenda' | 'history' | 'settings' | 'notifications';
+type ClinicNavKey = 'dashboard' | 'registration' | 'registered' | 'veterinarians' | 'agenda' | 'history' | 'settings' | 'notifications';
 
 type ClinicShellProps = React.PropsWithChildren<{
   active: ClinicNavKey;
@@ -75,6 +75,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
   const navItems: NavItem[] = [
     { key: 'dashboard', label: 'Dashboard', icon: Home, path: '/clinic-dashboard' },
     { key: 'registration', label: 'Cadastrar pet', icon: PawPrint, path: '/clinic-pet-registration' },
+    { key: 'registered', label: 'Pets cadastrados', icon: PawPrint, path: '/clinic-pets' },
     { key: 'veterinarians', label: 'Veterinários', icon: Stethoscope, path: '/clinic-veterinarians' },
     { key: 'agenda', label: 'Agenda', icon: CalendarDays, path: '/clinic-agenda' },
     { key: 'history', label: 'Histórico', icon: ClipboardList, path: '/clinic-history' },

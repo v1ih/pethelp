@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { pool } from '../../db/index.js';
+import type { RowDataPacket } from '../../db/types.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import {
@@ -25,6 +26,9 @@ router.use(requireAuth);
 
 // O convite vale 7 dias: o responsável costuma abrir o e-mail bem depois da consulta.
 const INVITE_TTL_MINUTES = 7 * 24 * 60;
+
+// Validade do Vet-Pass criado junto com o cadastro (o responsável pode encerrar antes).
+const VET_PASS_DAYS = 90;
 
 function asTrimmedString(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -76,6 +80,8 @@ function petSummaryEmailTemplate(options: {
   petLines: Array<[string, string]>;
   isNewAccount: boolean;
   email: string;
+  vetPassCode: string;
+  vetPassExpiresAt: Date;
 }) {
   const rows = options.petLines
     .map(
@@ -111,12 +117,134 @@ function petSummaryEmailTemplate(options: {
         ${rows}
       </table>
       ${accessBlock}
+      <div style="margin: 20px 0 0; border: 1px solid #d8e6df; background: #f2f8f5; border-radius: 12px; padding: 16px;">
+        <p style="margin: 0 0 8px; font-size: 14px;"><strong>Compartilhamento com a clínica</strong></p>
+        <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
+          Os dados de ${escapeHtml(options.petLines[0]?.[1] ?? 'seu pet')} estão sendo compartilhados com
+          <strong>${escapeHtml(options.clinicName)}</strong> por meio de um Vet-Pass, para que a clínica possa
+          acompanhar prontuário, vacinas e exames.
+        </p>
+        <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
+          Código do Vet-Pass: <strong style="font-family: monospace;">${escapeHtml(options.vetPassCode)}</strong><br />
+          Válido até ${options.vetPassExpiresAt.toLocaleDateString('pt-BR')}.
+        </p>
+        <p style="margin: 0; font-size: 14px; color: #5f6a64;">
+          No app, em <strong>Compartilhamentos</strong>, você acompanha esse Vet-Pass a qualquer momento e pode
+          <strong>encerrá-lo quando quiser</strong>.
+        </p>
+      </div>
       <p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">
-        Se algum dado estiver errado, você mesmo pode corrigir no app. Não reconhece esta clínica? Ignore este e-mail.
+        Se algum dado estiver errado, você mesmo pode corrigir no app. Não reconhece esta clínica? Encerre o
+        Vet-Pass em Compartilhamentos e fale com a clínica.
       </p>
     </div>
   </div>`;
 }
+
+function parseList(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatDay(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+/** Pets que ESTA clínica cadastrou, com os dados do responsável e o Vet-Pass do cadastro. */
+router.get('/', async (req: AuthRequest, res, next) => {
+  try {
+    if (req.user?.userType !== 'clinic') {
+      res.status(403).json({ message: 'Apenas clínicas podem ver esta lista.' });
+      return;
+    }
+
+    const clinic = await findClinicByUserId(req.user.id);
+    if (!clinic) {
+      res.status(404).json({ message: 'Perfil da clínica não encontrado.' });
+      return;
+    }
+
+    const search = asTrimmedString(req.query.q).toLowerCase();
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `
+        SELECT
+          p.id, p.name, p.species, p.breed, p.age, p.weight, p.sex, p.neutered, p.photo,
+          p.allergies, p.conditions, p.is_active, p.created_at, p.linked_clinic_id,
+          t.id AS tutor_id, t.name AS tutor_name, t.phone AS tutor_phone,
+          u.email AS tutor_email, u.email_verified AS tutor_email_verified,
+          vp.pass_code, vp.expires_at AS pass_expires_at
+        FROM pets p
+        LEFT JOIN tutors t ON t.id = p.current_tutor_id
+        LEFT JOIN users u ON u.id = t.user_id
+        LEFT JOIN LATERAL (
+          SELECT pass_code, expires_at
+          FROM vet_passes
+          WHERE pet_id = p.id AND redeemed_by_user_id = ?
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) vp ON TRUE
+        WHERE p.registered_by_clinic_id = ?
+          AND (
+            ? = ''
+            OR LOWER(p.name) LIKE ?
+            OR LOWER(COALESCE(t.name, '')) LIKE ?
+            OR LOWER(COALESCE(u.email, '')) LIKE ?
+          )
+        ORDER BY p.created_at DESC
+        LIMIT 200
+      `,
+      [req.user.id, clinic.id, search, `%${search}%`, `%${search}%`, `%${search}%`]
+    );
+
+    res.json({
+      data: rows.map((row) => {
+        const passExpiresAt = row.pass_expires_at ? new Date(row.pass_expires_at as string) : null;
+        return {
+          id: String(row.id),
+          name: row.name,
+          species: row.species,
+          breed: row.breed ?? null,
+          age: row.age ?? null,
+          weight: row.weight ?? null,
+          sex: row.sex ?? null,
+          neutered: typeof row.neutered === 'boolean' ? row.neutered : null,
+          photo: row.photo ?? null,
+          allergies: parseList(row.allergies),
+          conditions: parseList(row.conditions),
+          isActive: Boolean(row.is_active),
+          registeredAt: formatDay(row.created_at),
+          // A clínica perde o acesso pelo vínculo se o responsável desvincular o pet.
+          stillLinked: row.linked_clinic_id === clinic.id,
+          tutor: {
+            id: row.tutor_id ? String(row.tutor_id) : null,
+            name: row.tutor_name ?? null,
+            email: row.tutor_email ?? null,
+            phone: row.tutor_phone ?? null,
+            emailVerified: Boolean(row.tutor_email_verified),
+          },
+          vetPass: row.pass_code
+            ? {
+                code: String(row.pass_code),
+                expiresAt: passExpiresAt ? passExpiresAt.toISOString() : null,
+                active: passExpiresAt ? passExpiresAt.getTime() > Date.now() : false,
+              }
+            : null,
+        };
+      }),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.post('/', async (req: AuthRequest, res, next) => {
   const connection = await pool.getConnection();
@@ -208,13 +336,14 @@ router.post('/', async (req: AuthRequest, res, next) => {
     await connection.execute(
       `
         INSERT INTO pets (
-          id, current_tutor_id, linked_clinic_id, name, species, breed, age, weight, photo,
+          id, current_tutor_id, linked_clinic_id, registered_by_clinic_id, name, species, breed, age, weight, photo,
           allergies, conditions, sex, neutered
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         petId,
         tutorProfileId,
+        clinic.id,
         clinic.id,
         petName,
         petSpecies,
@@ -227,6 +356,20 @@ router.post('/', async (req: AuthRequest, res, next) => {
         asNullableString(petBody.sex),
         asNullableBoolean(petBody.neutered),
       ]
+    );
+
+    // Vet-Pass já em uso pela clínica: o responsável enxerga esse compartilhamento em
+    // "Compartilhamentos" e pode encerrá-lo quando quiser.
+    const vetPassCode = `VET-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+    const vetPassExpiresAt = new Date(Date.now() + VET_PASS_DAYS * 24 * 60 * 60 * 1000);
+    await connection.execute(
+      `
+        INSERT INTO vet_passes (
+          id, pass_code, tutor_id, pet_id, pet_name, documents, redeemed_by_user_id,
+          expires_at, redeemed_at, includes_medical_records, includes_vaccines, includes_exams
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE, TRUE, TRUE)
+      `,
+      [randomUUID(), vetPassCode, tutorProfileId, petId, petName, '[]', req.user.id, vetPassExpiresAt]
     );
 
     await connection.execute(
@@ -275,6 +418,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
           petLines,
           isNewAccount,
           email: tutorEmail,
+          vetPassCode,
+          vetPassExpiresAt,
         })
       );
       summarySent = summary.sent;
@@ -317,6 +462,10 @@ router.post('/', async (req: AuthRequest, res, next) => {
           name: tutorDisplayName,
           email: tutorEmail,
           isNewAccount,
+        },
+        vetPass: {
+          code: vetPassCode,
+          expiresAt: vetPassExpiresAt.toISOString(),
         },
         summaryEmailSent: summarySent,
         inviteEmailSent: inviteSent,

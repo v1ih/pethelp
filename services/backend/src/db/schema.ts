@@ -65,6 +65,9 @@ CREATE TABLE IF NOT EXISTS pets (
 );
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS sex VARCHAR(20);
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS neutered BOOLEAN;
+-- Clínica que criou o cadastro (diferente de linked_clinic_id, que é só o vínculo atual):
+-- permite à clínica listar depois os pets que ela mesma cadastrou.
+ALTER TABLE pets ADD COLUMN IF NOT EXISTS registered_by_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL;
 CREATE TABLE IF NOT EXISTS pet_ownership_history (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
   previous_tutor_id UUID REFERENCES tutors(id) ON DELETE SET NULL, new_tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE RESTRICT,
@@ -110,6 +113,8 @@ CREATE TABLE IF NOT EXISTS vaccines (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE vaccines ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;
+-- Foto opcional da vacina ou da carteirinha (data URL de imagem, já reduzida no navegador).
+ALTER TABLE vaccines ADD COLUMN IF NOT EXISTS photo TEXT;
 CREATE TABLE IF NOT EXISTS referrals (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE RESTRICT,
   veterinarian_id UUID NOT NULL REFERENCES veterinarians(id) ON DELETE RESTRICT, target_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL,
