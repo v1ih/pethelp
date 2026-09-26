@@ -8,6 +8,11 @@ import { ReviewsProvider } from './context/ReviewsContext';
 import { AppThemeProvider } from './components/layout/ThemeProvider';
 import { OnboardingProvider } from './context/OnboardingContext';
 import { Toaster } from './components/ui/sonner';
+import SupportButton from './components/support/SupportButton';
+import { installErrorLog } from './utils/errorLog';
+
+// Captura os erros do navegador desde o início, para irem junto no relato de suporte.
+installErrorLog();
 
 export default function App() {
   return (
@@ -20,6 +25,7 @@ export default function App() {
                 <OnboardingProvider>
                   <div className="size-full">
                     <RouterProvider router={router} />
+                    <SupportButton />
                     <Toaster richColors closeButton />
                   </div>
                 </OnboardingProvider>
