@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS pets (
 );
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS sex VARCHAR(20);
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS neutered BOOLEAN;
+-- Data de nascimento: quando preenchida, a idade é calculada na hora de exibir (e o
+-- sistema manda os parabéns no dia). A coluna "age" continua para pets resgatados,
+-- em que só se sabe a idade aproximada.
+ALTER TABLE pets ADD COLUMN IF NOT EXISTS birth_date DATE;
 -- Clínica que criou o cadastro (diferente de linked_clinic_id, que é só o vínculo atual):
 -- permite à clínica listar depois os pets que ela mesma cadastrou.
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS registered_by_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL;
@@ -127,6 +131,29 @@ CREATE TABLE IF NOT EXISTS notifications (
   type VARCHAR(20) NOT NULL CHECK (type IN ('vaccine','appointment','connection','referral')), title VARCHAR(180) NOT NULL, message TEXT NOT NULL,
   notification_date DATE NOT NULL, read_at TIMESTAMP, created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Abre espaço para o aviso de aniversário do pet. Procura o CHECK pelo conteúdo (e não
+-- pelo nome, que pode variar entre bancos) e só mexe quando ele ainda não aceita
+-- 'birthday' — assim o ALTER não roda a cada boot.
+DO $$
+DECLARE constraint_row record; needs_fix boolean := FALSE;
+BEGIN
+  FOR constraint_row IN
+    SELECT conname, pg_get_constraintdef(oid) AS def
+    FROM pg_constraint
+    WHERE conrelid = 'notifications'::regclass AND contype = 'c'
+      AND pg_get_constraintdef(oid) ILIKE '%referral%'
+  LOOP
+    IF constraint_row.def NOT ILIKE '%birthday%' THEN
+      EXECUTE format('ALTER TABLE notifications DROP CONSTRAINT %I', constraint_row.conname);
+      needs_fix := TRUE;
+    END IF;
+  END LOOP;
+
+  IF needs_fix THEN
+    ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+      CHECK (type IN ('vaccine','appointment','connection','referral','birthday'));
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS vet_passes (
   id UUID PRIMARY KEY, pass_code VARCHAR(64) NOT NULL UNIQUE, tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE CASCADE,
   pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE, pet_name VARCHAR(120) NOT NULL, documents JSONB NOT NULL,

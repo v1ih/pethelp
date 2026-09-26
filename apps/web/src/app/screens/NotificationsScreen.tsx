@@ -1,7 +1,7 @@
 ﻿import React from 'react';
 import { useNavigate } from 'react-router';
 import { useState } from 'react';
-import { Bell, Calendar, Link as LinkIcon, Syringe, Trash2 } from 'lucide-react';
+import { Bell, Cake, Calendar, Link as LinkIcon, Syringe, Trash2 } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { TutorShell } from '../components/layout/TutorShell';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
@@ -27,6 +27,8 @@ function NotificationsList({
         return <Syringe className="h-5 w-5 text-primary" />;
       case 'appointment':
         return <Calendar className="h-5 w-5 text-primary" />;
+      case 'birthday':
+        return <Cake className="h-5 w-5 text-primary" />;
       case 'connection':
         return <LinkIcon className="h-5 w-5 text-primary" />;
       default:

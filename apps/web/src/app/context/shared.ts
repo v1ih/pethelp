@@ -14,6 +14,8 @@ export interface Pet {
   conditions: string[] | null;
   sex?: string | null;
   neutered?: boolean | null;
+  /** Data de nascimento (YYYY-MM-DD). Quando existe, a idade é calculada a partir dela. */
+  birthDate?: string | null;
   linkedClinicId?: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -33,6 +35,7 @@ export type PetMutationPayload = {
   conditions?: string[] | null;
   sex?: string | null;
   neutered?: boolean | null;
+  birthDate?: string | null;
   isActive?: boolean;
   linkedClinicId?: string | null;
 };
@@ -93,7 +96,7 @@ export interface Appointment {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'vaccine' | 'appointment' | 'connection' | 'referral';
+  type: 'vaccine' | 'appointment' | 'connection' | 'referral' | 'birthday';
   title: string;
   message: string;
   date: string;
@@ -362,6 +365,7 @@ export function normalizePetFromApi(pet: any): Pet {
     conditions: parsePetArray(pet.conditions),
     sex: pet.sex ?? null,
     neutered: typeof pet.neutered === 'boolean' ? pet.neutered : null,
+    birthDate: pet.birthDate ?? pet.birth_date ?? null,
     linkedClinicId: pet.linkedClinicId ?? null,
     isActive: Boolean(pet.isActive ?? pet.is_active ?? false),
     createdAt: pet.createdAt ?? pet.created_at,

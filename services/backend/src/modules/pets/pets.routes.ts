@@ -27,6 +27,7 @@ type PetRow = RowDataPacket & {
   conditions: string | null;
   sex: string | null;
   neutered: boolean | null;
+  birth_date: Date | string | null;
   is_active: number | boolean;
   created_at: Date;
   updated_at: Date;
@@ -48,6 +49,7 @@ const petSelectFields = `
   conditions,
   sex,
   neutered,
+  birth_date,
   is_active,
   created_at,
   updated_at
@@ -73,6 +75,42 @@ function parseSafeJson(value: unknown) {
   }
 }
 
+/** Datas vêm do driver como Date ou string; o app espera sempre 'YYYY-MM-DD'. */
+function formatDateOnly(value: Date | string | null | undefined) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${value.getFullYear()}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+}
+
+/** Valida a data de nascimento: 'YYYY-MM-DD', real e não futura. */
+function parseBirthDate(value: unknown): { ok: true; value: string | null } | { ok: false; message: string } {
+  if (value === null) return { ok: true, value: null };
+
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return { ok: true, value: null };
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return { ok: false, message: 'Data de nascimento inválida.' };
+  }
+
+  const parsed = new Date(`${text}T00:00:00`);
+  if (Number.isNaN(parsed.getTime()) || formatDateOnly(parsed) !== text) {
+    return { ok: false, message: 'Data de nascimento inválida.' };
+  }
+
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  if (parsed.getTime() > today.getTime()) {
+    return { ok: false, message: 'A data de nascimento não pode estar no futuro.' };
+  }
+
+  return { ok: true, value: text };
+}
+
 function normalizePet(row: PetRow) {
   const currentTutorId = (row as PetRow & { currentTutorId?: string | null }).currentTutorId ?? row.current_tutor_id;
   const linkedClinicId = (row as PetRow & { linkedClinicId?: string | null }).linkedClinicId ?? row.linked_clinic_id;
@@ -93,6 +131,7 @@ function normalizePet(row: PetRow) {
     conditions: parseSafeJson(row.conditions),
     sex: row.sex ?? null,
     neutered: row.neutered ?? null,
+    birthDate: formatDateOnly(row.birth_date),
     isActive: Boolean(isActive),
     createdAt: (row as PetRow & { createdAt?: Date }).createdAt ?? row.created_at,
     updatedAt: (row as PetRow & { updatedAt?: Date }).updatedAt ?? row.updated_at,
@@ -311,6 +350,12 @@ petsRouter.post('/', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    const birthDate = parseBirthDate(body.birthDate ?? body.birth_date);
+    if (!birthDate.ok) {
+      res.status(400).json({ message: birthDate.message });
+      return;
+    }
+
     await connection.beginTransaction();
 
     const id = randomUUID();
@@ -328,10 +373,11 @@ petsRouter.post('/', async (req: AuthRequest, res, next) => {
           allergies,
           conditions,
           sex,
-          neutered
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          neutered,
+          birth_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [id, currentTutorId, name, species, breed, age, weight, photo, allergies, conditions, sex, neutered]
+      [id, currentTutorId, name, species, breed, age, weight, photo, allergies, conditions, sex, neutered, birthDate.value]
     );
 
     await connection.commit();
@@ -427,6 +473,17 @@ petsRouter.patch('/:id', async (req: AuthRequest, res, next) => {
       } else {
         values.push((typeof body[field] === 'string' ? body[field].trim() : body[field]) as string | null);
       }
+    }
+
+    // Fica fora do laço porque precisa de validação própria e aceita null (limpar a data).
+    if (body.birthDate !== undefined || body.birth_date !== undefined) {
+      const birthDate = parseBirthDate(body.birthDate ?? body.birth_date);
+      if (!birthDate.ok) {
+        res.status(400).json({ message: birthDate.message });
+        return;
+      }
+      assignments.push('birth_date = ?');
+      values.push(birthDate.value);
     }
 
     if (assignments.length === 0) {

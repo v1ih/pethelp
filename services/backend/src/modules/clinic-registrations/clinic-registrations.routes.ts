@@ -55,6 +55,17 @@ function asStringListJson(value: unknown) {
   return items.length ? JSON.stringify(items) : null;
 }
 
+/** Data de nascimento do pet: só aceita 'YYYY-MM-DD' que não esteja no futuro. */
+function asBirthDate(value: unknown) {
+  const text = asTrimmedString(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+
+  const parsed = new Date(`${text}T00:00:00`);
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() > Date.now()) return null;
+
+  return text;
+}
+
 function asNullableBoolean(value: unknown) {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value === 'boolean') return value;
@@ -177,7 +188,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
     const [rows] = await pool.query<RowDataPacket[]>(
       `
         SELECT
-          p.id, p.name, p.species, p.breed, p.age, p.weight, p.sex, p.neutered, p.photo,
+          p.id, p.name, p.species, p.breed, p.age, p.weight, p.sex, p.neutered, p.photo, p.birth_date,
           p.allergies, p.conditions, p.is_active, p.created_at, p.linked_clinic_id,
           t.id AS tutor_id, t.name AS tutor_name, t.phone AS tutor_phone,
           u.email AS tutor_email, u.email_verified AS tutor_email_verified,
@@ -217,6 +228,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
           weight: row.weight ?? null,
           sex: row.sex ?? null,
           neutered: typeof row.neutered === 'boolean' ? row.neutered : null,
+          birthDate: formatDay(row.birth_date),
           photo: row.photo ?? null,
           allergies: parseList(row.allergies),
           conditions: parseList(row.conditions),
@@ -337,8 +349,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
       `
         INSERT INTO pets (
           id, current_tutor_id, linked_clinic_id, registered_by_clinic_id, name, species, breed, age, weight, photo,
-          allergies, conditions, sex, neutered
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          allergies, conditions, sex, neutered, birth_date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         petId,
@@ -355,6 +367,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
         asStringListJson(petBody.conditions),
         asNullableString(petBody.sex),
         asNullableBoolean(petBody.neutered),
+        // A clínica costuma ter a data de nascimento na ficha do atendimento.
+        asBirthDate(petBody.birthDate),
       ]
     );
 

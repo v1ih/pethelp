@@ -4,6 +4,7 @@ import { ArrowRight, CheckCircle, ChevronRight, PawPrint, Plus } from 'lucide-re
 import { usePets } from '../context/PetsContext';
 import { useDashboardBackLogout } from '../navigation';
 import { TutorShell } from '../components/layout/TutorShell';
+import { petAgeLabel } from '../utils/age';
 
 export default function OwnerDashboardScreen() {
   const navigate = useNavigate();
@@ -123,7 +124,7 @@ export default function OwnerDashboardScreen() {
               <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Idade</p>
-                  <p className="mt-1 text-sm text-foreground">{activePet.age || 'Não informada'}</p>
+                  <p className="mt-1 text-sm text-foreground">{petAgeLabel(activePet)}</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/35 px-4 py-3">
                   <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Peso</p>
@@ -212,7 +213,7 @@ export default function OwnerDashboardScreen() {
                       {pet.breed || 'Raça não informada'}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
-                      {pet.age || 'Idade não informada'} • {pet.weight || 'Peso não informado'}
+                      {petAgeLabel(pet, 'Idade não informada')} • {pet.weight || 'Peso não informado'}
                     </p>
                   </div>
 

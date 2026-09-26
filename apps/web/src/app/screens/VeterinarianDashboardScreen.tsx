@@ -24,6 +24,7 @@ import { useReviews } from '../context/ReviewsContext';
 import { useSession } from '../context/SessionContext';
 import { useDashboardBackLogout } from '../navigation';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
+import { petAgeLabel } from '../utils/age';
 
 type PreviewAttachment = {
   name: string;
@@ -37,6 +38,7 @@ type RemotePetSummary = {
   species?: string | null;
   breed?: string | null;
   age?: string | null;
+  birthDate?: string | null;
   weight?: string | null;
   sex?: string | null;
   neutered?: boolean | null;
@@ -108,6 +110,7 @@ function normalizePetSummary(value: any): RemotePetSummary {
     species: value.species ?? null,
     breed: value.breed ?? null,
     age: value.age ?? null,
+    birthDate: value.birthDate ?? value.birth_date ?? null,
     weight: value.weight ?? null,
     sex: value.sex ?? null,
     neutered: typeof value.neutered === 'boolean' ? value.neutered : null,
@@ -640,7 +643,7 @@ export default function VeterinarianDashboardScreen() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-border bg-background px-4 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Idade</p>
-                    <p className="mt-1 text-sm text-foreground">{petSummary?.age || 'Não informada'}</p>
+                    <p className="mt-1 text-sm text-foreground">{petAgeLabel(petSummary)}</p>
                   </div>
                   <div className="rounded-2xl border border-border bg-background px-4 py-3">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Peso</p>

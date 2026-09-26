@@ -4,6 +4,7 @@ import { Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff } from
 import { toast } from 'sonner';
 import { ClinicShell } from '../components/layout/ClinicShell';
 import { getApiBase, getAuthHeaders } from '../context/shared';
+import { petAgeLabel } from '../utils/age';
 
 type RegisteredPet = {
   id: string;
@@ -14,6 +15,7 @@ type RegisteredPet = {
   weight: string | null;
   sex: string | null;
   neutered: boolean | null;
+  birthDate: string | null;
   photo: string | null;
   allergies: string[] | null;
   conditions: string[] | null;
@@ -198,7 +200,7 @@ export default function ClinicRegisteredPetsScreen() {
                     </header>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      <DataItem label="Idade" value={pet.age || 'Não informada'} />
+                      <DataItem label="Idade" value={petAgeLabel(pet)} />
                       <DataItem label="Peso" value={pet.weight || 'Não informado'} />
                       <DataItem label="Sexo" value={pet.sex || 'Não informado'} />
                       <DataItem

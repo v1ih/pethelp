@@ -1,16 +1,19 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle, Camera, Download, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle, Camera, Download, Eye, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useHealth } from '../context/HealthContext';
 import { usePets } from '../context/PetsContext';
 import { useAppNavigation } from '../navigation';
 import { TutorShell } from '../components/layout/TutorShell';
+import { useSession } from '../context/SessionContext';
 import { fileToCompressedDataUrl } from '../utils/image';
+import { shareOrDownloadVaccinationCard } from '../utils/vaccinationCardPdf';
 
 export default function VaccinationScreen() {
   const navigate = useNavigate();
   const { currentPet } = usePets();
+  const { user } = useSession();
   const { vaccines, addVaccine, updateVaccine, deleteVaccine } = useHealth();
   const { goToPetContext } = useAppNavigation();
   const [showForm, setShowForm] = useState(false);
@@ -24,6 +27,7 @@ export default function VaccinationScreen() {
   const [clinicName, setClinicName] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   // Vacina cuja foto está aberta em tela cheia.
   const [photoInView, setPhotoInView] = useState<{ name: string; photo: string } | null>(null);
 
@@ -39,6 +43,26 @@ export default function VaccinationScreen() {
   }
 
   const petVaccines = vaccines.filter((v) => v.petId === currentPet.id);
+
+  const handleExportPdf = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await shareOrDownloadVaccinationCard({
+        pet: currentPet,
+        vaccines: petVaccines,
+        tutorName: user?.name ?? null,
+      });
+      if (result === 'downloaded') {
+        toast.success('Carteirinha em PDF baixada.');
+      }
+    } catch (error) {
+      console.error('Falha ao gerar a carteirinha em PDF:', error);
+      toast.error('Não foi possível gerar a carteirinha em PDF.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const clearForm = () => {
     setEditingId(null);
@@ -114,7 +138,32 @@ export default function VaccinationScreen() {
   };
 
   return (
-    <TutorShell active="vaccines" title="Carteira de Vacinação" description={`Histórico de imunização de ${currentPet.name}`} actions={<button onClick={() => (showForm ? clearForm() : startCreate())} className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90">{showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}<span>{editingId ? 'Editar Vacina' : 'Registrar Vacina'}</span></button>}>
+    <TutorShell
+      active="vaccines"
+      title="Carteira de Vacinação"
+      description={`Histórico de imunização de ${currentPet.name}`}
+      actions={
+        <>
+          <button
+            onClick={() => (showForm ? clearForm() : startCreate())}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90 sm:w-auto"
+          >
+            {showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            <span>{editingId ? 'Editar Vacina' : 'Registrar Vacina'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportPdf()}
+            disabled={exporting || petVaccines.length === 0}
+            title={petVaccines.length === 0 ? 'Registre uma vacina para gerar a carteirinha' : undefined}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          >
+            <FileDown className="h-4 w-4" />
+            <span>{exporting ? 'Gerando PDF...' : 'Carteirinha em PDF'}</span>
+          </button>
+        </>
+      }
+    >
       <div className="space-y-6">
         {showForm && (
           <form onSubmit={handleSubmit} className="rounded-[34px] border border-border/70 bg-card p-6 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-8">

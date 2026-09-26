@@ -23,6 +23,34 @@ function reminderEmail(title: string, intro: string, lines: string[]) {
   </div>`;
 }
 
+/** E-mail comemorativo do aniversário do pet. */
+function birthdayEmail(petName: string, tutorName: string, years: number) {
+  const greeting = tutorName ? `Oi, ${tutorName}!` : 'Oi!';
+  const ageLine =
+    years > 0
+      ? `Hoje ${petName} completa <strong>${years === 1 ? '1 aninho' : `${years} aninhos`}</strong>.`
+      : `Hoje é o dia de <strong>${petName}</strong>.`;
+
+  return `
+  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1b2320;">
+    <div style="background: linear-gradient(135deg, #7fa26a, #6b8c59); color: #fff; padding: 28px 24px; border-radius: 16px 16px 0 0; text-align: center;">
+      <div style="font-size: 42px; line-height: 1;">🎂</div>
+      <h1 style="margin: 10px 0 0; font-size: 22px;">Feliz aniversário, ${petName}!</h1>
+    </div>
+    <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px; text-align: center;">
+      <p style="margin: 0 0 12px; color: #5f6a64;">${greeting}</p>
+      <p style="margin: 0 0 16px; font-size: 16px;">${ageLine}</p>
+      <p style="margin: 0 0 16px; color: #5f6a64;">
+        Que tal aproveitar a data para conferir se a carteira de vacinação está em dia?
+        No PetHelp você vê as próximas doses e ainda pode exportar a carteirinha em PDF.
+      </p>
+      <p style="margin: 0; font-size: 13px; color: #5f6a64;">
+        Você recebe este aviso porque cadastrou a data de nascimento de ${petName} no PetHelp.
+      </p>
+    </div>
+  </div>`;
+}
+
 async function notificationExists(userId: string, sourceKey: string): Promise<boolean> {
   const [rows] = await pool.query<RowDataPacket[]>(
     'SELECT id FROM notifications WHERE user_id = ? AND source_key = ? LIMIT 1',
@@ -36,7 +64,7 @@ async function createNotification(input: {
   petId: string | null;
   appointmentId: string | null;
   sourceKey: string;
-  type: 'vaccine' | 'appointment';
+  type: 'vaccine' | 'appointment' | 'birthday';
   title: string;
   message: string;
 }) {
@@ -122,7 +150,56 @@ export async function runReminders() {
     }
   }
 
-  return { vaccineCount, appointmentCount, emailsSent };
+  // 3) Aniversário do pet (só para pets com data de nascimento preenchida).
+  const [birthdayRows] = await pool.query<RowDataPacket[]>(
+    `SELECT p.id AS pet_id, p.name AS pet_name,
+            EXTRACT(YEAR FROM AGE(CURRENT_DATE, p.birth_date))::int AS years,
+            TO_CHAR(CURRENT_DATE, 'YYYY') AS current_year,
+            t.name AS tutor_name, t.user_id AS user_id, u.email AS email
+     FROM pets p
+     JOIN tutors t ON t.id = p.current_tutor_id
+     JOIN users u ON u.id = t.user_id AND u.is_active = TRUE
+     WHERE p.is_active = TRUE AND p.birth_date IS NOT NULL
+       AND EXTRACT(MONTH FROM p.birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+       AND EXTRACT(DAY FROM p.birth_date) = EXTRACT(DAY FROM CURRENT_DATE)`,
+    []
+  );
+
+  let birthdayCount = 0;
+  for (const row of birthdayRows as any[]) {
+    // Uma vez por ano por pet, mesmo que o cron rode mais de uma vez no mesmo dia.
+    const sourceKey = `pet-birthday:${row.pet_id}:${row.current_year}`;
+    if (await notificationExists(row.user_id, sourceKey)) continue;
+
+    const years = Number(row.years) || 0;
+    const title = `Feliz aniversário, ${row.pet_name}! 🎉`;
+    const message =
+      years > 0
+        ? `Hoje ${row.pet_name} completa ${years === 1 ? '1 aninho' : `${years} aninhos`}. Aproveite o dia!`
+        : `Hoje é o dia de ${row.pet_name}. Aproveite!`;
+
+    await createNotification({
+      userId: row.user_id,
+      petId: row.pet_id,
+      appointmentId: null,
+      sourceKey,
+      type: 'birthday',
+      title,
+      message,
+    });
+    birthdayCount += 1;
+
+    if (row.email) {
+      const { sent } = await sendEmail(
+        row.email,
+        `🎉 ${row.pet_name} faz aniversário hoje!`,
+        birthdayEmail(String(row.pet_name), String(row.tutor_name ?? ''), years)
+      );
+      if (sent) emailsSent += 1;
+    }
+  }
+
+  return { vaccineCount, appointmentCount, birthdayCount, emailsSent };
 }
 
 // Vercel Cron chama via GET com "Authorization: Bearer <CRON_SECRET>" quando CRON_SECRET está definido.

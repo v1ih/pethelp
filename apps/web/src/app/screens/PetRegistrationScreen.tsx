@@ -4,6 +4,7 @@ import { Camera, PawPrint } from 'lucide-react';
 import { usePets } from '../context/PetsContext';
 import { TutorShell } from '../components/layout/TutorShell';
 import ImageCropper from '../components/pets/ImageCropper';
+import { formatAgeFromBirthDate } from '../utils/age';
 
 export default function PetRegistrationScreen() {
   const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function PetRegistrationScreen() {
   const [speciesMode, setSpeciesMode] = useState('');
   const [sex, setSex] = useState(''); // 'Macho' | 'Fêmea' | ''
   const [neutered, setNeutered] = useState(''); // 'sim' | 'nao' | ''
+  const [birthDate, setBirthDate] = useState('');
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [weight, setWeight] = useState('');
@@ -38,6 +40,7 @@ export default function PetRegistrationScreen() {
       setSpeciesMode('');
       setSex('');
       setNeutered('');
+      setBirthDate('');
       setAge('');
       setBreed('');
       setWeight('');
@@ -52,6 +55,7 @@ export default function PetRegistrationScreen() {
     setSpeciesMode(selectedPet.species ? (['Cachorro', 'Gato'].includes(selectedPet.species) ? selectedPet.species : 'Outro') : '');
     setSex(selectedPet.sex || '');
     setNeutered(selectedPet.neutered === true ? 'sim' : selectedPet.neutered === false ? 'nao' : '');
+    setBirthDate(selectedPet.birthDate ? String(selectedPet.birthDate).slice(0, 10) : '');
     // Idade/peso são guardados como "3 anos"/"25 kg"; no formulário editamos só o número.
     setAge((selectedPet.age || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
     setBreed(selectedPet.breed || '');
@@ -71,7 +75,14 @@ export default function PetRegistrationScreen() {
         species: species.trim(),
         sex: sex || null,
         neutered: neutered === 'sim' ? true : neutered === 'nao' ? false : null,
-        age: age.trim() ? `${age.trim().replace(',', '.')} ${age.trim().replace(',', '.') === '1' ? 'ano' : 'anos'}` : null,
+        birthDate: birthDate || null,
+        // Com data de nascimento a idade é calculada na exibição; o campo livre só vale
+        // quando não se sabe o nascimento (caso comum em pet resgatado).
+        age: birthDate
+          ? null
+          : age.trim()
+            ? `${age.trim().replace(',', '.')} ${age.trim().replace(',', '.') === '1' ? 'ano' : 'anos'}`
+            : null,
         breed: breed.trim() || null,
         weight: weight.trim() ? `${weight.trim().replace(',', '.')} kg` : null,
         photo: photo || null,
@@ -230,16 +241,49 @@ export default function PetRegistrationScreen() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="age" className="mb-2 block text-foreground">Idade (anos)</label>
-                <div className="relative">
-                  <input type="number" inputMode="decimal" min="0" step="0.5" id="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary" placeholder="3" />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">anos</span>
-                </div>
+                <label htmlFor="birthDate" className="mb-2 block text-foreground">Data de nascimento</label>
+                <input
+                  type="date"
+                  id="birthDate"
+                  value={birthDate}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary"
+                />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {birthDate && formatAgeFromBirthDate(birthDate)
+                    ? `Idade hoje: ${formatAgeFromBirthDate(birthDate)} — atualizada sozinha, e avisamos no aniversário. 🎂`
+                    : 'Se você souber, preencha: a idade passa a se atualizar sozinha e avisamos no aniversário.'}
+                </p>
               </div>
               <div>
-                <label htmlFor="breed" className="mb-2 block text-foreground">Raça</label>
-                <input type="text" id="breed" value={breed} onChange={(e) => setBreed(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Golden Retriever" />
+                <label htmlFor="age" className="mb-2 block text-foreground">
+                  Idade aproximada (anos)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.5"
+                    id="age"
+                    value={birthDate ? '' : age}
+                    disabled={Boolean(birthDate)}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 pr-14 text-foreground outline-none transition-colors focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    placeholder="3"
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">anos</span>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {birthDate ? 'Calculada pela data de nascimento.' : 'Use quando não souber a data de nascimento.'}
+                </p>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="breed" className="mb-2 block text-foreground">Raça</label>
+              <input type="text" id="breed" value={breed} onChange={(e) => setBreed(e.target.value)} className="w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-foreground outline-none transition-colors focus:border-primary" placeholder="Golden Retriever" />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">

@@ -41,6 +41,7 @@ export default function ClinicPetRegistrationScreen() {
   const [petName, setPetName] = useState('');
   const [speciesMode, setSpeciesMode] = useState('');
   const [species, setSpecies] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [sex, setSex] = useState('');
   const [neutered, setNeutered] = useState('');
   const [age, setAge] = useState('');
@@ -61,6 +62,7 @@ export default function ClinicPetRegistrationScreen() {
     setPetName('');
     setSpeciesMode('');
     setSpecies('');
+    setBirthDate('');
     setSex('');
     setNeutered('');
     setAge('');
@@ -119,9 +121,12 @@ export default function ClinicPetRegistrationScreen() {
           pet: {
             name: petName.trim(),
             species: species.trim(),
+            birthDate: birthDate || null,
             sex: sex || null,
             neutered: neutered === 'sim' ? true : neutered === 'nao' ? false : null,
-            age: trimmedAge ? `${trimmedAge} ${trimmedAge === '1' ? 'ano' : 'anos'}` : null,
+            // Com data de nascimento a idade é calculada; o campo livre só vale quando
+            // o nascimento é desconhecido.
+            age: birthDate ? null : trimmedAge ? `${trimmedAge} ${trimmedAge === '1' ? 'ano' : 'anos'}` : null,
             breed: breed.trim() || null,
             weight: trimmedWeight ? `${trimmedWeight} kg` : null,
             allergies: allergiesStr
@@ -386,6 +391,23 @@ export default function ClinicPetRegistrationScreen() {
               ) : null}
             </div>
 
+            <div>
+              <label htmlFor="clinicPetBirthDate" className="mb-2 block text-foreground">
+                Data de nascimento
+              </label>
+              <input
+                id="clinicPetBirthDate"
+                type="date"
+                value={birthDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setBirthDate(event.target.value)}
+                className={inputClass}
+              />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Se estiver na ficha, preencha: a idade passa a se atualizar sozinha no app do responsável.
+              </p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="clinicPetSex" className="mb-2 block text-foreground">
@@ -417,7 +439,7 @@ export default function ClinicPetRegistrationScreen() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="clinicPetAge" className="mb-2 block text-foreground">
-                  Idade (anos)
+                  Idade aproximada (anos)
                 </label>
                 <div className="relative">
                   <input
@@ -426,9 +448,10 @@ export default function ClinicPetRegistrationScreen() {
                     inputMode="decimal"
                     min="0"
                     step="0.5"
-                    value={age}
+                    value={birthDate ? '' : age}
+                    disabled={Boolean(birthDate)}
                     onChange={(event) => setAge(event.target.value)}
-                    className={`${inputClass} pr-14`}
+                    className={`${inputClass} pr-14 disabled:cursor-not-allowed disabled:opacity-60`}
                     placeholder="3"
                   />
                   <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">

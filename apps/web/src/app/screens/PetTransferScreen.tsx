@@ -5,6 +5,7 @@ import { getDashboardRouteForUserType } from '../context/shared';
 import { usePets } from '../context/PetsContext';
 import { useSession } from '../context/SessionContext';
 import { TutorShell } from '../components/layout/TutorShell';
+import { petAgeLabel } from '../utils/age';
 
 export default function PetTransferScreen() {
   const navigate = useNavigate();
@@ -177,7 +178,7 @@ export default function PetTransferScreen() {
                           {pet.breed || 'Raça não informada'}
                         </p>
                         <p className="mt-2 text-xs text-muted-foreground">
-                          {pet.age || 'Idade não informada'} • {pet.weight || 'Peso não informado'}
+                          {petAgeLabel(pet, 'Idade não informada')} • {pet.weight || 'Peso não informado'}
                         </p>
                       </div>
                     </button>
