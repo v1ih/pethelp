@@ -12,18 +12,65 @@ import {
   findClinicByUserId,
   findTutorByUserId,
   findUserByEmail,
+  findVeterinarianByUserId,
 } from '../users/users.service.js';
 import { createEmailCode, normalizeEmail } from '../auth/email-codes.js';
 import { isEmailConfigured, sendEmail } from '../mail/mailer.js';
 
 /**
- * Cadastro feito pela clínica: a clínica registra o pet (e, se preciso, cria o acesso do
- * responsável) e o PetHelp entrega as informações ao responsável — por e-mail, por
- * notificação no app e, quando a conta é nova, com um código para ele definir a senha.
+ * Cadastro de pet feito por um profissional — clínica ou veterinário autônomo. Ele
+ * registra o pet (e, se preciso, cria o acesso do responsável) e o PetHelp entrega as
+ * informações ao responsável: e-mail, notificação no app e, quando a conta é nova, um
+ * código para definir a senha. O acesso do profissional vem de um Vet-Pass, que o
+ * responsável enxerga e pode encerrar.
  */
 const router = Router();
 
 router.use(requireAuth);
+
+type Professional = {
+  kind: 'clinic' | 'veterinarian';
+  /** id do perfil: clinics.id ou veterinarians.id. */
+  id: string;
+  userId: string;
+  displayName: string;
+  /** "a clínica" / "o(a) veterinário(a)" — usado nos textos enviados ao responsável. */
+  noun: string;
+  nounCapitalized: string;
+};
+
+/** Identifica o profissional logado. Só clínica e veterinário cadastram por aqui. */
+async function resolveProfessional(user: AuthRequest['user']): Promise<Professional | null> {
+  if (!user) return null;
+
+  if (user.userType === 'clinic') {
+    const clinic = await findClinicByUserId(user.id);
+    if (!clinic) return null;
+    return {
+      kind: 'clinic',
+      id: clinic.id,
+      userId: user.id,
+      displayName: clinic.trade_name,
+      noun: 'a clínica',
+      nounCapitalized: 'A clínica',
+    };
+  }
+
+  if (user.userType === 'veterinarian') {
+    const veterinarian = await findVeterinarianByUserId(user.id);
+    if (!veterinarian) return null;
+    return {
+      kind: 'veterinarian',
+      id: veterinarian.id,
+      userId: user.id,
+      displayName: veterinarian.name,
+      noun: 'o(a) veterinário(a)',
+      nounCapitalized: 'O(a) veterinário(a)',
+    };
+  }
+
+  return null;
+}
 
 // O convite vale 7 dias: o responsável costuma abrir o e-mail bem depois da consulta.
 const INVITE_TTL_MINUTES = 7 * 24 * 60;
@@ -90,7 +137,7 @@ function escapeHtml(value: string) {
  * já preenchido: pedir para usar "Esqueci minha senha" geraria um código novo e
  * invalidaria justamente o código deste e-mail.
  */
-function firstAccessEmailTemplate(options: { clinicName: string; email: string; code: string }) {
+function firstAccessEmailTemplate(options: { professional: Professional; email: string; code: string }) {
   const link = `${env.appUrl}/primeiro-acesso?email=${encodeURIComponent(options.email)}`;
 
   return `
@@ -101,7 +148,8 @@ function firstAccessEmailTemplate(options: { clinicName: string; email: string; 
     <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
       <h2 style="margin: 0 0 12px; font-size: 18px;">Defina sua senha do PetHelp</h2>
       <p style="margin: 0 0 16px; color: #5f6a64;">
-        A clínica <strong>${escapeHtml(options.clinicName)}</strong> criou seu acesso com o e-mail
+        ${escapeHtml(options.professional.nounCapitalized)}
+        <strong>${escapeHtml(options.professional.displayName)}</strong> criou seu acesso com o e-mail
         <strong>${escapeHtml(options.email)}</strong>. Use o código abaixo para criar sua senha.
       </p>
       <div style="font-size: 30px; font-weight: 700; letter-spacing: 6px; text-align: center; background: #e4f0eb; color: #155e4b; padding: 16px; border-radius: 12px;">${escapeHtml(
@@ -117,16 +165,16 @@ function firstAccessEmailTemplate(options: { clinicName: string; email: string; 
         <a href="${link}" style="color: #1f7a63; word-break: break-all;">${link}</a>
       </p>
       <p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">
-        O código expira em 7 dias. Se não reconhece esta clínica, ignore este e-mail.
+        O código expira em 7 dias. Se você não reconhece quem fez este cadastro, ignore este e-mail.
       </p>
     </div>
   </div>`;
 }
 
-/** E-mail com o resumo do que a clínica cadastrou, para o responsável conferir. */
+/** E-mail com o resumo do que o profissional cadastrou, para o responsável conferir. */
 function petSummaryEmailTemplate(options: {
   tutorName: string;
-  clinicName: string;
+  professional: Professional;
   petLines: Array<[string, string]>;
   isNewAccount: boolean;
   email: string;
@@ -158,9 +206,12 @@ function petSummaryEmailTemplate(options: {
       <h1 style="margin: 0; font-size: 20px;">🐾 PetHelp</h1>
     </div>
     <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
-      <h2 style="margin: 0 0 12px; font-size: 18px;">Cadastro feito pela clínica</h2>
+      <h2 style="margin: 0 0 12px; font-size: 18px;">
+        ${options.professional.kind === 'clinic' ? 'Cadastro feito pela clínica' : 'Cadastro feito pelo veterinário'}
+      </h2>
       <p style="margin: 0 0 16px; color: #5f6a64;">
-        Olá, ${escapeHtml(options.tutorName)}! A clínica <strong>${escapeHtml(options.clinicName)}</strong>
+        Olá, ${escapeHtml(options.tutorName)}! ${escapeHtml(options.professional.nounCapitalized)}
+        <strong>${escapeHtml(options.professional.displayName)}</strong>
         cadastrou os dados do seu pet no PetHelp. Confira abaixo:
       </p>
       <table style="width: 100%; border-collapse: collapse; background: #f6f8f6; border-radius: 12px;">
@@ -168,10 +219,12 @@ function petSummaryEmailTemplate(options: {
       </table>
       ${accessBlock}
       <div style="margin: 20px 0 0; border: 1px solid #d8e6df; background: #f2f8f5; border-radius: 12px; padding: 16px;">
-        <p style="margin: 0 0 8px; font-size: 14px;"><strong>Compartilhamento com a clínica</strong></p>
+        <p style="margin: 0 0 8px; font-size: 14px;"><strong>
+          ${options.professional.kind === 'clinic' ? 'Compartilhamento com a clínica' : 'Compartilhamento com o veterinário'}
+        </strong></p>
         <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
           Os dados de ${escapeHtml(options.petLines[0]?.[1] ?? 'seu pet')} estão sendo compartilhados com
-          <strong>${escapeHtml(options.clinicName)}</strong> por meio de um Vet-Pass, para que a clínica possa
+          <strong>${escapeHtml(options.professional.displayName)}</strong> por meio de um Vet-Pass, para
           acompanhar prontuário, vacinas e exames.
         </p>
         <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
@@ -184,8 +237,8 @@ function petSummaryEmailTemplate(options: {
         </p>
       </div>
       <p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">
-        Se algum dado estiver errado, você mesmo pode corrigir no app. Não reconhece esta clínica? Encerre o
-        Vet-Pass em Compartilhamentos e fale com a clínica.
+        Se algum dado estiver errado, você mesmo pode corrigir no app. Não reconhece quem fez este cadastro?
+        Encerre o Vet-Pass em Compartilhamentos.
       </p>
     </div>
   </div>`;
@@ -208,21 +261,18 @@ function formatDay(value: unknown) {
   return String(value).slice(0, 10);
 }
 
-/** Pets que ESTA clínica cadastrou, com os dados do responsável e o Vet-Pass do cadastro. */
+/** Pets que ESTE profissional cadastrou, com os dados do responsável e o Vet-Pass. */
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    if (req.user?.userType !== 'clinic') {
-      res.status(403).json({ message: 'Apenas clínicas podem ver esta lista.' });
-      return;
-    }
-
-    const clinic = await findClinicByUserId(req.user.id);
-    if (!clinic) {
-      res.status(404).json({ message: 'Perfil da clínica não encontrado.' });
+    const professional = await resolveProfessional(req.user);
+    if (!professional) {
+      res.status(403).json({ message: 'Apenas clínicas e veterinários podem ver esta lista.' });
       return;
     }
 
     const search = asTrimmedString(req.query.q).toLowerCase();
+    const ownerColumn =
+      professional.kind === 'clinic' ? 'p.registered_by_clinic_id' : 'p.registered_by_veterinarian_id';
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `
@@ -242,7 +292,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
           ORDER BY created_at DESC
           LIMIT 1
         ) vp ON TRUE
-        WHERE p.registered_by_clinic_id = ?
+        WHERE ${ownerColumn} = ?
           AND (
             ? = ''
             OR LOWER(p.name) LIKE ?
@@ -252,7 +302,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         ORDER BY p.created_at DESC
         LIMIT 200
       `,
-      [req.user.id, clinic.id, search, `%${search}%`, `%${search}%`, `%${search}%`]
+      [professional.userId, professional.id, search, `%${search}%`, `%${search}%`, `%${search}%`]
     );
 
     res.json({
@@ -273,8 +323,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
           conditions: parseList(row.conditions),
           isActive: Boolean(row.is_active),
           registeredAt: formatDay(row.created_at),
-          // A clínica perde o acesso pelo vínculo se o responsável desvincular o pet.
-          stillLinked: row.linked_clinic_id === clinic.id,
+          // Só a clínica tem vínculo direto com o pet; o veterinário acompanha pelo Vet-Pass.
+          stillLinked: professional.kind === 'clinic' ? row.linked_clinic_id === professional.id : null,
           tutor: {
             id: row.tutor_id ? String(row.tutor_id) : null,
             name: row.tutor_name ?? null,
@@ -302,14 +352,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
   let transactionOpen = false;
 
   try {
-    if (req.user?.userType !== 'clinic') {
-      res.status(403).json({ message: 'Apenas clínicas podem usar este cadastro.' });
-      return;
-    }
-
-    const clinic = await findClinicByUserId(req.user.id);
-    if (!clinic) {
-      res.status(404).json({ message: 'Perfil da clínica não encontrado.' });
+    const professional = await resolveProfessional(req.user);
+    if (!professional) {
+      res.status(403).json({ message: 'Apenas clínicas e veterinários podem usar este cadastro.' });
       return;
     }
 
@@ -387,15 +432,18 @@ router.post('/', async (req: AuthRequest, res, next) => {
     await connection.execute(
       `
         INSERT INTO pets (
-          id, current_tutor_id, linked_clinic_id, registered_by_clinic_id, name, species, breed, age, weight, photo,
+          id, current_tutor_id, linked_clinic_id, registered_by_clinic_id, registered_by_veterinarian_id,
+          name, species, breed, age, weight, photo,
           allergies, conditions, sex, neutered, birth_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         petId,
         tutorProfileId,
-        clinic.id,
-        clinic.id,
+        // O vínculo direto é coisa de clínica; o veterinário acompanha pelo Vet-Pass.
+        professional.kind === 'clinic' ? professional.id : null,
+        professional.kind === 'clinic' ? professional.id : null,
+        professional.kind === 'veterinarian' ? professional.id : null,
         petName,
         petSpecies,
         asNullableString(petBody.breed),
@@ -406,13 +454,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
         asStringListJson(petBody.conditions),
         asNullableString(petBody.sex),
         asNullableBoolean(petBody.neutered),
-        // A clínica costuma ter a data de nascimento na ficha do atendimento.
+        // O profissional costuma ter a data de nascimento na ficha do atendimento.
         asBirthDate(petBody.birthDate),
       ]
     );
 
-    // Vet-Pass já em uso pela clínica: o responsável enxerga esse compartilhamento em
-    // "Compartilhamentos" e pode encerrá-lo quando quiser.
+    // Vet-Pass já em uso pelo profissional: é o que dá acesso ao veterinário autônomo,
+    // e o responsável enxerga isso em "Compartilhamentos" e encerra quando quiser.
     const vetPassCode = `VET-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
     const vetPassExpiresAt = new Date(Date.now() + VET_PASS_DAYS * 24 * 60 * 60 * 1000);
     await connection.execute(
@@ -422,7 +470,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           expires_at, redeemed_at, includes_medical_records, includes_vaccines, includes_exams
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE, TRUE, TRUE)
       `,
-      [randomUUID(), vetPassCode, tutorProfileId, petId, petName, '[]', req.user.id, vetPassExpiresAt]
+      [randomUUID(), vetPassCode, tutorProfileId, petId, petName, '[]', professional.userId, vetPassExpiresAt]
     );
 
     await connection.execute(
@@ -436,7 +484,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         petId,
         `clinic-registration:${petId}`,
         'Cadastro feito pela clínica',
-        `A clínica ${clinic.trade_name} cadastrou ${petName} no seu perfil. Confira e complete os dados quando quiser.`,
+        `${professional.nounCapitalized} ${professional.displayName} cadastrou ${petName} no seu perfil. Confira e complete os dados quando quiser.`,
       ]
     );
 
@@ -455,7 +503,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
     if (weight) petLines.push(['Peso', weight]);
     if (sex) petLines.push(['Sexo', sex]);
     if (neutered !== null) petLines.push(['Castrado(a)', neutered ? 'Sim' : 'Não']);
-    petLines.push(['Clínica', clinic.trade_name]);
+    petLines.push([professional.kind === 'clinic' ? 'Clínica' : 'Veterinário(a)', professional.displayName]);
 
     let summarySent = false;
     let inviteSent = false;
@@ -464,10 +512,10 @@ router.post('/', async (req: AuthRequest, res, next) => {
     try {
       const summary = await sendEmail(
         tutorEmail,
-        `${petName} foi cadastrado no PetHelp por ${clinic.trade_name}`,
+        `${petName} foi cadastrado no PetHelp por ${professional.displayName}`,
         petSummaryEmailTemplate({
           tutorName: tutorDisplayName,
-          clinicName: clinic.trade_name,
+          professional,
           petLines,
           isNewAccount,
           email: tutorEmail,
@@ -489,7 +537,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           tutorEmail,
           'Seu acesso ao PetHelp',
           firstAccessEmailTemplate({
-            clinicName: clinic.trade_name,
+            professional,
             email: tutorEmail,
             code,
           })

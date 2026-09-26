@@ -9,8 +9,8 @@ import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
 import OwnerDashboardScreen from './screens/OwnerDashboardScreen';
 import ClinicDashboardScreen from './screens/ClinicDashboardScreen';
 import ClinicAgendaScreen from './screens/ClinicAgendaScreen';
-import ClinicPetRegistrationScreen from './screens/ClinicPetRegistrationScreen';
-import ClinicRegisteredPetsScreen from './screens/ClinicRegisteredPetsScreen';
+import PetRegistrationByProfessionalScreen from './screens/PetRegistrationByProfessionalScreen';
+import ProfessionalRegisteredPetsScreen from './screens/ProfessionalRegisteredPetsScreen';
 import ClinicHistoryScreen from './screens/ClinicHistoryScreen';
 import VeterinarianDashboardScreen from './screens/VeterinarianDashboardScreen';
 import VeterinarianScheduleScreen from './screens/VeterinarianScheduleScreen';
@@ -149,11 +149,20 @@ export const router = createBrowserRouter([
   },
   {
     path: '/clinic-pet-registration',
-    Component: withAllowedUserTypes(ClinicPetRegistrationScreen, ['clinic']),
+    Component: withAllowedUserTypes(PetRegistrationByProfessionalScreen, ['clinic']),
   },
   {
     path: '/clinic-pets',
-    Component: withAllowedUserTypes(ClinicRegisteredPetsScreen, ['clinic']),
+    Component: withAllowedUserTypes(ProfessionalRegisteredPetsScreen, ['clinic']),
+  },
+  {
+    // Mesmas telas do cadastro por clínica, agora para o veterinário autônomo.
+    path: '/veterinarian-pet-registration',
+    Component: withAllowedUserTypes(PetRegistrationByProfessionalScreen, ['veterinarian']),
+  },
+  {
+    path: '/veterinarian-pets',
+    Component: withAllowedUserTypes(ProfessionalRegisteredPetsScreen, ['veterinarian']),
   },
   {
     path: '/clinic-agenda',

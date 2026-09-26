@@ -274,13 +274,25 @@ petsRouter.get('/', async (req: AuthRequest, res, next) => {
       conditions.push('linked_clinic_id = ?');
       values.push(clinicId);
     } else if (req.user?.userType === 'veterinarian') {
-      if (accessibleClinicIds.length === 0) {
-        res.json({ data: [] });
-        return;
-      }
+      // O veterinário enxerga os pets das clínicas em que está aprovado e também
+      // aqueles para os quais tem um Vet-Pass válido — é assim que o autônomo, sem
+      // clínica, acompanha os pets que ele mesmo cadastrou. Se o responsável encerrar
+      // o compartilhamento, o pet sai da lista sozinho.
+      const clinicCondition = accessibleClinicIds.length
+        ? `linked_clinic_id IN (${accessibleClinicIds.map(() => '?').join(', ')})`
+        : null;
+      const passCondition = `id IN (
+        SELECT pet_id FROM vet_passes
+        WHERE redeemed_by_user_id = ? AND expires_at >= CURRENT_TIMESTAMP
+      )`;
 
-      conditions.push(`linked_clinic_id IN (${accessibleClinicIds.map(() => '?').join(', ')})`);
-      values.push(...accessibleClinicIds);
+      if (clinicCondition) {
+        conditions.push(`(${clinicCondition} OR ${passCondition})`);
+        values.push(...accessibleClinicIds, req.user.id);
+      } else {
+        conditions.push(passCondition);
+        values.push(req.user.id);
+      }
     }
 
     if (!showInactive) {

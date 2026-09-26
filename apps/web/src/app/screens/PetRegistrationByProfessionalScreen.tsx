@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Check, ClipboardCheck, Copy, Mail, PawPrint, ShieldCheck, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { ClinicShell } from '../components/layout/ClinicShell';
+import { ProfessionalShell } from '../components/layout/ProfessionalShell';
+import { useSession } from '../context/SessionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { maskCPF, maskPhone } from '../utils/masks';
 
@@ -29,9 +30,14 @@ type RegistrationResult = {
 const inputClass =
   'w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-base text-foreground outline-none transition-colors focus:border-primary';
 
-export default function ClinicPetRegistrationScreen() {
+export default function PetRegistrationByProfessionalScreen() {
   const navigate = useNavigate();
   const API_BASE = getApiBase();
+  const { user } = useSession();
+  const isVet = user?.userType === 'veterinarian';
+  const registrationPath = isVet ? '/veterinarian-pet-registration' : '/clinic-pet-registration';
+  const registeredPath = isVet ? '/veterinarian-pets' : '/clinic-pets';
+  const dashboardPath = isVet ? '/veterinarian-dashboard' : '/clinic-dashboard';
 
   const [tutorName, setTutorName] = useState('');
   const [tutorEmail, setTutorEmail] = useState('');
@@ -108,7 +114,7 @@ export default function ClinicPetRegistrationScreen() {
 
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/api/clinic-registrations`, {
+      const resp = await fetch(`${API_BASE}/api/pet-registrations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
@@ -156,10 +162,10 @@ export default function ClinicPetRegistrationScreen() {
 
   if (result) {
     return (
-      <ClinicShell
+      <ProfessionalShell
         active="registration"
         title="Cadastro enviado ao responsável"
-        description="O pet já está vinculado à clínica e o responsável recebeu as informações."
+        description={`O responsável recebeu as informações e o pet já está ${isVet ? 'sob seu acompanhamento' : 'vinculado à clínica'}.`}
       >
         <div className="mx-auto max-w-2xl space-y-4">
           <div className="rounded-[28px] border border-primary/30 bg-primary/5 p-5 sm:p-6">
@@ -188,8 +194,8 @@ export default function ClinicPetRegistrationScreen() {
               </li>
               <li className="flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                Vet-Pass <strong className="font-mono">{result.vetPass.code}</strong> criado: a clínica acompanha
-                prontuário, vacinas e exames até{' '}
+                Vet-Pass <strong className="font-mono">{result.vetPass.code}</strong> criado:{' '}
+                {isVet ? 'você acompanha' : 'a clínica acompanha'} prontuário, vacinas e exames até{' '}
                 {new Date(result.vetPass.expiresAt).toLocaleDateString('pt-BR')}. O responsável vê esse
                 compartilhamento em "Compartilhamentos" e pode encerrá-lo quando quiser.
               </li>
@@ -242,22 +248,22 @@ export default function ClinicPetRegistrationScreen() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/clinic-pets')}
+              onClick={() => navigate(registeredPath)}
               className="inline-flex min-h-12 w-full items-center justify-center rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted sm:w-auto"
             >
               Ver pets cadastrados
             </button>
           </div>
         </div>
-      </ClinicShell>
+      </ProfessionalShell>
     );
   }
 
   return (
-    <ClinicShell
+    <ProfessionalShell
       active="registration"
       title="Cadastrar pet e responsável"
-      description="A clínica preenche os dados no atendimento e o PetHelp entrega tudo ao responsável: e-mail com o resumo, notificação no app e, se ele ainda não tiver conta, um acesso já criado."
+      description={`${isVet ? 'Você preenche' : 'A clínica preenche'} os dados no atendimento e o PetHelp entrega tudo ao responsável: e-mail com o resumo, notificação no app e, se ele ainda não tiver conta, um acesso já criado.`}
     >
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-4">
         <p className="rounded-[18px] border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
@@ -530,7 +536,7 @@ export default function ClinicPetRegistrationScreen() {
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={() => navigate('/clinic-dashboard')}
+            onClick={() => navigate(dashboardPath)}
             disabled={loading}
             className="inline-flex min-h-12 w-full items-center justify-center rounded-[18px] border border-border bg-background px-6 py-3 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60 sm:w-auto"
           >
@@ -546,6 +552,6 @@ export default function ClinicPetRegistrationScreen() {
           </button>
         </div>
       </form>
-    </ClinicShell>
+    </ProfessionalShell>
   );
 }

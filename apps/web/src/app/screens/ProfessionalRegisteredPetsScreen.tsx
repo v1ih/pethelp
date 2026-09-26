@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff } from 'lucide-react';
 import { toast } from 'sonner';
-import { ClinicShell } from '../components/layout/ClinicShell';
+import { ProfessionalShell } from '../components/layout/ProfessionalShell';
+import { useSession } from '../context/SessionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { petAgeLabel } from '../utils/age';
 
@@ -47,9 +48,14 @@ function DataItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function ClinicRegisteredPetsScreen() {
+export default function ProfessionalRegisteredPetsScreen() {
   const navigate = useNavigate();
   const API_BASE = getApiBase();
+  const { user } = useSession();
+  const isVet = user?.userType === 'veterinarian';
+  const registrationPath = isVet ? '/veterinarian-pet-registration' : '/clinic-pet-registration';
+  const registeredPath = isVet ? '/veterinarian-pets' : '/clinic-pets';
+  const dashboardPath = isVet ? '/veterinarian-dashboard' : '/clinic-dashboard';
 
   const [pets, setPets] = useState<RegisteredPet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +64,7 @@ export default function ClinicRegisteredPetsScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/api/clinic-registrations`, { headers: getAuthHeaders() });
+      const resp = await fetch(`${API_BASE}/api/pet-registrations`, { headers: getAuthHeaders() });
       const payload = await resp.json().catch(() => null);
       if (!resp.ok) {
         throw new Error(payload?.message ?? 'Não foi possível carregar os pets cadastrados.');
@@ -87,15 +93,15 @@ export default function ClinicRegisteredPetsScreen() {
   }, [pets, search]);
 
   return (
-    <ClinicShell
+    <ProfessionalShell
       active="registered"
-      title="Pets cadastrados pela clínica"
-      description="Todos os pets que a clínica registrou, com os dados do responsável e a situação do compartilhamento."
+      title={isVet ? 'Pets que você cadastrou' : 'Pets cadastrados pela clínica'}
+      description={`Todos os pets que ${isVet ? 'você registrou' : 'a clínica registrou'}, com os dados do responsável e a situação do compartilhamento.`}
       actions={
         <>
           <button
             type="button"
-            onClick={() => navigate('/clinic-pet-registration')}
+            onClick={() => navigate(registrationPath)}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90 sm:w-auto"
           >
             <PawPrint className="h-5 w-5" />
@@ -132,12 +138,14 @@ export default function ClinicRegisteredPetsScreen() {
         ) : filtered.length === 0 ? (
           <div className="rounded-[28px] border border-dashed border-border bg-card p-6 text-center sm:p-8">
             <p className="text-foreground">
-              {pets.length === 0 ? 'A clínica ainda não cadastrou nenhum pet.' : 'Nenhum pet encontrado para essa busca.'}
+              {pets.length === 0
+                ? `${isVet ? 'Você' : 'A clínica'} ainda não cadastrou nenhum pet.`
+                : 'Nenhum pet encontrado para essa busca.'}
             </p>
             {pets.length === 0 ? (
               <button
                 type="button"
-                onClick={() => navigate('/clinic-pet-registration')}
+                onClick={() => navigate(registrationPath)}
                 className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"
               >
                 <PawPrint className="h-5 w-5" />
@@ -149,7 +157,8 @@ export default function ClinicRegisteredPetsScreen() {
           <>
             <p className="text-sm text-muted-foreground">
               {filtered.length} pet{filtered.length === 1 ? '' : 's'}
-              {search.trim() ? ` de ${pets.length}` : ''} cadastrado{filtered.length === 1 ? '' : 's'} pela clínica.
+              {search.trim() ? ` de ${pets.length}` : ''} cadastrado{filtered.length === 1 ? '' : 's'}{' '}
+              {isVet ? 'por você' : 'pela clínica'}.
             </p>
 
             <div className="space-y-4">
@@ -258,6 +267,6 @@ export default function ClinicRegisteredPetsScreen() {
           </>
         )}
       </div>
-    </ClinicShell>
+    </ProfessionalShell>
   );
 }

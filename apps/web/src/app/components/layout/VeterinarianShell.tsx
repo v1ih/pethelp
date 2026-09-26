@@ -1,6 +1,6 @@
 ﻿import * as React from 'react';
 import { useNavigate } from 'react-router';
-import { Bell, CalendarDays, ClipboardList, HelpCircle, Home, Link2, LogOut, Settings } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, HelpCircle, Home, Link2, LogOut, PawPrint, Settings } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import EmailVerificationBanner from './EmailVerificationBanner';
 import { useInteraction } from '../../context/InteractionContext';
@@ -9,7 +9,7 @@ import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 import { getDashboardRouteForUserType, getSettingsRouteForUserType, type UserType } from '../../context/shared';
 
-type VeterinarianNavKey = 'dashboard' | 'agenda' | 'links' | 'history' | 'settings';
+type VeterinarianNavKey = 'dashboard' | 'registration' | 'registered' | 'agenda' | 'links' | 'history' | 'settings';
 
 type VeterinarianShellProps = React.PropsWithChildren<{
   active: VeterinarianNavKey;
@@ -58,6 +58,8 @@ export default function VeterinarianShell({ active, title, description, actions,
 
   const navItems: NavItem[] = [
     { key: 'dashboard', label: 'Dashboard', icon: Home, path: dashboardPath, visibleFor: ['veterinarian'] },
+    { key: 'registration', label: 'Cadastrar pet', icon: PawPrint, path: '/veterinarian-pet-registration', visibleFor: ['veterinarian'] },
+    { key: 'registered', label: 'Pets cadastrados', icon: ClipboardList, path: '/veterinarian-pets', visibleFor: ['veterinarian'] },
     { key: 'agenda', label: 'Agenda', icon: CalendarDays, path: '/veterinarian-schedule', visibleFor: ['veterinarian'] },
     { key: 'links', label: 'Vínculos', icon: Link2, path: '/veterinarian-links', visibleFor: ['veterinarian'] },
     { key: 'history', label: 'Histórico', icon: ClipboardList, path: '/veterinarian-history', visibleFor: ['veterinarian'] },

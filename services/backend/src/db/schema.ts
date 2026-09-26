@@ -75,6 +75,8 @@ ALTER TABLE pets ADD COLUMN IF NOT EXISTS birth_date DATE;
 -- Clínica que criou o cadastro (diferente de linked_clinic_id, que é só o vínculo atual):
 -- permite à clínica listar depois os pets que ela mesma cadastrou.
 ALTER TABLE pets ADD COLUMN IF NOT EXISTS registered_by_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL;
+-- Mesma ideia para o veterinário autônomo, que cadastra sem estar ligado a uma clínica.
+ALTER TABLE pets ADD COLUMN IF NOT EXISTS registered_by_veterinarian_id UUID REFERENCES veterinarians(id) ON DELETE SET NULL;
 CREATE TABLE IF NOT EXISTS pet_ownership_history (
   id UUID PRIMARY KEY, pet_id UUID NOT NULL REFERENCES pets(id) ON DELETE CASCADE,
   previous_tutor_id UUID REFERENCES tutors(id) ON DELETE SET NULL, new_tutor_id UUID NOT NULL REFERENCES tutors(id) ON DELETE RESTRICT,
