@@ -88,8 +88,8 @@ export default function VeterinarianShell({ active, title, description, actions,
               type="button"
               onClick={openHelp}
               className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-foreground transition-colors hover:bg-muted sm:h-11 sm:w-11"
-              aria-label="Ajuda e tutorial"
-              title="Ajuda e tutorial"
+              aria-label="Tutorial: como usar o app"
+              title="Tutorial: como usar o app"
             >
               <HelpCircle className="h-5 w-5" />
             </button>
@@ -134,7 +134,7 @@ export default function VeterinarianShell({ active, title, description, actions,
           </nav>
         </aside>
 
-        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="min-w-0 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pt-8">
           <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:hidden [&::-webkit-scrollbar]:hidden">
             {navItems.map((item) => (
               <button

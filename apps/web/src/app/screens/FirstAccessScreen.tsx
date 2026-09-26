@@ -126,7 +126,7 @@ export default function FirstAccessScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--page-background)] px-4 py-10 text-foreground sm:px-6">
+    <div className="min-h-screen bg-[var(--page-background)] px-4 pb-28 pt-10 text-foreground sm:px-6">
       <div className="mx-auto w-full max-w-[520px]">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <img src="/icon.png" alt="PetHelp" className="h-14 w-14 object-contain" />

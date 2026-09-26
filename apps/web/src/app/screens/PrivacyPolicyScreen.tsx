@@ -19,7 +19,7 @@ export default function PrivacyPolicyScreen() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-[var(--page-background)] px-4 py-8 text-foreground sm:px-6">
+    <div className="min-h-screen bg-[var(--page-background)] px-4 pb-28 pt-8 text-foreground sm:px-6">
       <div className="mx-auto w-full max-w-3xl">
         <button
           type="button"

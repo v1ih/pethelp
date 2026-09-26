@@ -14,7 +14,7 @@ type AuthShellProps = React.PropsWithChildren<{
 const AUTH_STYLES = `
   .auth-page {
     min-height: 100vh;
-    padding: 38px 16px 30px;
+    padding: 38px 16px 110px;
     background: radial-gradient(circle at top left, rgba(127, 162, 106, 0.1), transparent 28%), radial-gradient(circle at top right, rgba(232, 209, 203, 0.18), transparent 25%), linear-gradient(180deg, #faf8f6 0%, #fefcfb 100%);
     color: #1a1a1a;
     font-family: 'DM Sans', system-ui, sans-serif;

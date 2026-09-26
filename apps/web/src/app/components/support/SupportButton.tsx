@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LifeBuoy, MessageCircle, Send, X } from 'lucide-react';
+import { MessageCircle, MessageCircleWarning, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from '../../context/SessionContext';
 import { getApiBase, getAuthHeaders } from '../../context/shared';
@@ -78,15 +78,18 @@ export default function SupportButton() {
 
   return (
     <>
+      {/* Com texto, e não só ícone: o "?" do cabeçalho já é o tutorial, então este
+          precisa dizer na letra que serve para relatar problema. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Suporte: relatar um problema"
-        title="Suporte"
-        className="fixed bottom-4 right-4 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:bottom-6 sm:right-6"
+        title="Relatar um problema"
+        className="fixed bottom-4 right-4 z-50 inline-flex min-h-14 items-center gap-2 rounded-full bg-primary px-5 text-[15px] font-medium text-white shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:bottom-6 sm:right-6"
         style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <LifeBuoy className="h-6 w-6" />
+        <MessageCircleWarning className="h-5 w-5 shrink-0" />
+        Suporte
       </button>
 
       {open ? (
@@ -103,9 +106,10 @@ export default function SupportButton() {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-xl font-medium text-foreground">Precisa de ajuda?</h2>
+                <h2 className="text-xl font-medium text-foreground">Deu algum problema?</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Conte o que aconteceu. Enviamos junto a tela em que você está, para facilitar a investigação.
+                  Conte o que aconteceu e a gente resolve. Enviamos junto a tela em que você está, para facilitar a
+                  investigação.
                 </p>
               </div>
               <button
@@ -177,6 +181,11 @@ export default function SupportButton() {
                 <MessageCircle className="h-4 w-4" />
                 Chamar no WhatsApp
               </a>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Quer aprender a usar o app? Toque no <strong className="text-foreground">?</strong> no topo da tela
+                para rever o tutorial.
+              </p>
             </form>
           </div>
         </div>
