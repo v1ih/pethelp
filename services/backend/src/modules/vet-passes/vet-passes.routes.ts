@@ -23,6 +23,7 @@ type VetPassRow = RowDataPacket & {
   includes_vaccines: boolean;
   includes_exams: boolean;
   redeemed_name?: string | null;
+  redeemed_type?: 'veterinarian' | 'clinic' | null;
   redeemed_email?: string | null;
 };
 
@@ -81,6 +82,7 @@ function normalizeVetPass(row: VetPassRow) {
     includesVaccines: row.includes_vaccines,
     includesExams: row.includes_exams,
     redeemedByName: row.redeemed_name ?? undefined,
+    redeemedByType: row.redeemed_type ?? undefined,
     redeemedByEmail: row.redeemed_email ?? undefined,
   };
 }
@@ -143,6 +145,7 @@ router.get('/me', async (req: AuthRequest, res, next) => {
         SELECT
           vp.*,
           COALESCE(v.name, c.trade_name) AS redeemed_name,
+          CASE WHEN v.id IS NOT NULL THEN 'veterinarian' WHEN c.id IS NOT NULL THEN 'clinic' END AS redeemed_type,
           u.email AS redeemed_email
         FROM vet_passes vp
         LEFT JOIN users u ON u.id = vp.redeemed_by_user_id
@@ -379,13 +382,34 @@ router.delete('/:code', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    // Quem está com o passe é uma clínica? Então encerrar o compartilhamento também
+    // desfaz o vínculo do pet com ela — senão a clínica continuaria enxergando o
+    // prontuário pelo vínculo e o "Encerrar" não cumpriria o que promete.
+    const [clinicRows] = pass.redeemed_by_user_id
+      ? await pool.query<RowDataPacket[]>('SELECT id, trade_name FROM clinics WHERE user_id = ? LIMIT 1', [
+          pass.redeemed_by_user_id,
+        ])
+      : [[] as RowDataPacket[]];
+    const holderClinic = clinicRows[0];
+
     const [result] = await pool.execute<ResultSetHeader>('DELETE FROM vet_passes WHERE pass_code = ?', [code]);
     if ((result.affectedRows ?? 0) === 0) {
       res.status(404).json({ message: 'Vet-Pass not found' });
       return;
     }
 
-    res.status(204).send();
+    let unlinkedClinicName: string | null = null;
+    if (holderClinic) {
+      const [unlink] = await pool.execute<ResultSetHeader>(
+        'UPDATE pets SET linked_clinic_id = NULL WHERE id = ? AND linked_clinic_id = ?',
+        [pass.pet_id, String(holderClinic.id)]
+      );
+      if ((unlink.affectedRows ?? 0) > 0) {
+        unlinkedClinicName = String(holderClinic.trade_name);
+      }
+    }
+
+    res.json({ message: 'Compartilhamento encerrado.', unlinkedClinicName });
   } catch (error) {
     next(error);
   }

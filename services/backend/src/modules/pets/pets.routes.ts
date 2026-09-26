@@ -630,6 +630,62 @@ petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
   }
 });
 
+/**
+ * Desfaz o vínculo do pet com a clínica. Também apaga os Vet-Pass que estejam com
+ * aquela clínica, para não sobrar um acesso ativo depois que o responsável desvincula.
+ */
+petsRouter.delete('/:id/link-clinic', async (req: AuthRequest, res, next) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const existing = await loadPetById(connection, String(req.params.id));
+    if (!existing) {
+      res.status(404).json({ message: 'Pet not found' });
+      return;
+    }
+
+    const tutorId = await resolveCurrentTutorId(req.user);
+    if (!canManagePet(tutorId, existing)) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    if (!existing.linked_clinic_id) {
+      res.status(400).json({ message: 'Este pet não está vinculado a nenhuma clínica.' });
+      return;
+    }
+
+    const previousClinicId = existing.linked_clinic_id;
+
+    await connection.beginTransaction();
+    await connection.execute<ResultSetHeader>('UPDATE pets SET linked_clinic_id = NULL WHERE id = ?', [
+      String(req.params.id),
+    ]);
+    await connection.execute<ResultSetHeader>(
+      `
+        DELETE FROM vet_passes
+        WHERE pet_id = ?
+          AND redeemed_by_user_id IN (SELECT user_id FROM clinics WHERE id = ?)
+      `,
+      [String(req.params.id), previousClinicId]
+    );
+    await connection.commit();
+
+    const updated = await loadPetById(connection, String(req.params.id));
+    if (!updated) {
+      res.status(500).json({ message: 'Pet unlink failed' });
+      return;
+    }
+
+    res.json({ data: normalizePet(updated), message: 'Vínculo com a clínica encerrado.' });
+  } catch (error) {
+    await connection.rollback();
+    next(error);
+  } finally {
+    connection.release();
+  }
+});
+
 // ---- Guarda compartilhada (co-responsáveis pelo animal) ----
 
 type GuardianRow = RowDataPacket & {

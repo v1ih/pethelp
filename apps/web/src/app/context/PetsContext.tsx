@@ -19,6 +19,9 @@ interface PetsContextValue {
   deletePet: (id: string) => Promise<void>;
   transferPetOwnership: (petId: string, payload: { targetTutorEmail: string; securityConfirmation: string; petNameConfirmation: string }) => Promise<Pet>;
   linkPetToClinic: (petId: string, clinicCode: string) => Promise<void>;
+  /** Reflete na tela que o pet deixou de estar vinculado a uma clínica. */
+  clearPetClinicLink: (petId: string) => void;
+  unlinkPetFromClinic: (petId: string) => Promise<void>;
 }
 
 const PetsContext = createContext<PetsContextValue | undefined>(undefined);
@@ -229,6 +232,24 @@ export function PetsProvider({ children }: { children: ReactNode }) {
     })();
   };
 
+  const clearPetClinicLink = (petId: string) => {
+    setPets((prev) => prev.map((petItem) => (petItem.id === petId ? { ...petItem, linkedClinicId: null } : petItem)));
+    setCurrentPet((prev) => (prev?.id === petId ? { ...prev, linkedClinicId: null } : prev));
+  };
+
+  const unlinkPetFromClinic = async (petId: string) => {
+    const resp = await fetch(`${API_BASE}/api/pets/${petId}/link-clinic`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!resp.ok) {
+      throw new Error((await resp.json().catch(() => null))?.message ?? 'Não foi possível desvincular a clínica.');
+    }
+
+    clearPetClinicLink(petId);
+  };
+
   const linkPetToClinic = async (petId: string, clinicCode: string) => {
     const resp = await fetch(`${API_BASE}/api/pets/${petId}/link-clinic`, {
       method: 'POST',
@@ -271,6 +292,8 @@ export function PetsProvider({ children }: { children: ReactNode }) {
         deletePet,
         transferPetOwnership,
         linkPetToClinic,
+        clearPetClinicLink,
+        unlinkPetFromClinic,
       }}
     >
       {children}

@@ -131,6 +131,7 @@ export interface VetPassRecord {
   includesVaccines?: boolean;
   includesExams?: boolean;
   redeemedByName?: string;
+  redeemedByType?: 'veterinarian' | 'clinic';
   redeemedByEmail?: string;
 }
 

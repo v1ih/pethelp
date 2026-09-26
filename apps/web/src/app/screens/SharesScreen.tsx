@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, Mail, PawPrint, ShieldCheck, ShieldOff, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiBase, getAuthHeaders, type VetPassRecord } from '../context/shared';
+import { usePets } from '../context/PetsContext';
 import { TutorShell } from '../components/layout/TutorShell';
 
 function toUiVetPass(item: any): VetPassRecord {
@@ -19,6 +20,7 @@ function toUiVetPass(item: any): VetPassRecord {
     includesExams: item.includesExams ?? item.includes_exams,
     redeemedByName: item.redeemedByName ?? item.redeemed_name ?? undefined,
     redeemedByEmail: item.redeemedByEmail ?? item.redeemed_email ?? undefined,
+    redeemedByType: item.redeemedByType ?? item.redeemed_type ?? undefined,
   };
 }
 
@@ -46,6 +48,7 @@ const toneClasses: Record<PassStatus['tone'], string> = {
 };
 
 export default function SharesScreen() {
+  const { clearPetClinicLink } = usePets();
   const [passes, setPasses] = useState<VetPassRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyCode, setBusyCode] = useState<string | null>(null);
@@ -92,13 +95,25 @@ export default function SharesScreen() {
     }
   };
 
-  const revoke = async (code: string) => {
-    setBusyCode(code);
+  const revoke = async (pass: VetPassRecord) => {
+    setBusyCode(pass.code);
     try {
-      const resp = await fetch(`${API_BASE}/api/vet-passes/${code}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const resp = await fetch(`${API_BASE}/api/vet-passes/${pass.code}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
       if (!resp.ok && resp.status !== 204) throw new Error('Falha ao encerrar');
-      setPasses((prev) => prev.filter((pass) => pass.code !== code));
-      toast.success('Compartilhamento encerrado. O código não vale mais.');
+
+      const payload = await resp.json().catch(() => null);
+      setPasses((current) => current.filter((item) => item.code !== pass.code));
+
+      // Quando o passe era de uma clínica, o vínculo do pet com ela também cai.
+      if (payload?.unlinkedClinicName) {
+        clearPetClinicLink(pass.petId);
+        toast.success(`${payload.unlinkedClinicName} não vê mais os dados de ${pass.petName}.`);
+      } else {
+        toast.success('Compartilhamento encerrado. O código não vale mais.');
+      }
     } catch (error) {
       console.error('Falha ao encerrar compartilhamento:', error);
       toast.error('Não foi possível encerrar o compartilhamento.');
@@ -108,10 +123,16 @@ export default function SharesScreen() {
   };
 
   const handleRevoke = (pass: VetPassRecord) => {
+    const holder = pass.redeemedByName;
+    const description =
+      pass.redeemedByType === 'clinic'
+        ? `${holder ?? 'A clínica'} deixa de ver o prontuário, as vacinas e os exames de ${pass.petName}, e o pet é desvinculado dela. Consultas e registros já feitos continuam no histórico, e você pode vincular de novo com o código da clínica.`
+        : 'O veterinário perde o acesso imediatamente e o código deixa de funcionar.';
+
     toast(`Encerrar o compartilhamento de ${pass.petName}?`, {
-      description: 'O veterinário perde o acesso imediatamente e o código deixa de funcionar.',
-      duration: 10000,
-      action: { label: 'Encerrar', onClick: () => void revoke(pass.code) },
+      description,
+      duration: 12000,
+      action: { label: 'Encerrar', onClick: () => void revoke(pass) },
       cancel: { label: 'Cancelar', onClick: () => {} },
     });
   };

@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Link as LinkIcon, QrCode, Check } from 'lucide-react';
+import { ArrowLeft, Link as LinkIcon, QrCode, Check, Unlink } from 'lucide-react';
+import { toast } from 'sonner';
 import { getDashboardRouteForUserType } from '../context/shared';
 import { usePets } from '../context/PetsContext';
 import { useSession } from '../context/SessionContext';
@@ -9,12 +10,40 @@ import { TutorShell } from '../components/layout/TutorShell';
 
 export default function ConnectionScreen() {
   const navigate = useNavigate();
-  const { currentPet, linkPetToClinic } = usePets();
+  const { currentPet, linkPetToClinic, unlinkPetFromClinic } = usePets();
   const { user } = useSession();
   const { goToPetContext } = useAppNavigation();
   const [clinicCode, setClinicCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
+
+  const handleUnlink = () => {
+    if (!currentPet) return;
+
+    toast(`Desvincular ${currentPet.name} da clínica?`, {
+      description:
+        'A clínica deixa de ver o prontuário, as vacinas e os exames deste pet, e os Vet-Pass dela são encerrados. As consultas e os registros já feitos continuam no histórico.',
+      duration: 12000,
+      action: {
+        label: 'Desvincular',
+        onClick: () => {
+          void (async () => {
+            setUnlinking(true);
+            try {
+              await unlinkPetFromClinic(currentPet.id);
+              toast.success('Vínculo encerrado. A clínica não vê mais os dados deste pet.');
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : 'Não foi possível desvincular a clínica.');
+            } finally {
+              setUnlinking(false);
+            }
+          })();
+        },
+      },
+      cancel: { label: 'Cancelar', onClick: () => {} },
+    });
+  };
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,9 +118,21 @@ export default function ConnectionScreen() {
       )}
 
       {currentPet?.linkedClinicId && (
-        <div className="mx-auto mt-6 max-w-3xl rounded-[28px] border border-border/70 bg-card p-6 shadow-[0_18px_42px_-30px_rgba(127,162,106,0.2)]">
+        <div className="mx-auto mt-6 max-w-3xl rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_18px_42px_-30px_rgba(127,162,106,0.2)] sm:p-6">
           <h3 className="mb-2 text-foreground">Vinculado Atualmente</h3>
-          <p className="text-sm text-muted-foreground">Este pet já possui um vínculo ativo com um estabelecimento</p>
+          <p className="text-sm text-muted-foreground">
+            Este pet já possui um vínculo ativo com um estabelecimento, que por isso acompanha o prontuário, as
+            vacinas e os exames dele.
+          </p>
+          <button
+            type="button"
+            onClick={handleUnlink}
+            disabled={unlinking}
+            className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-background px-5 py-3 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <Unlink className="h-4 w-4" />
+            {unlinking ? 'Desvinculando...' : 'Desvincular clínica'}
+          </button>
         </div>
       )}
     </TutorShell>
