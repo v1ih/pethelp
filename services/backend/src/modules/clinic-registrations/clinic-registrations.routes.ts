@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
+import { env } from '../../config/env.js';
 import { pool } from '../../db/index.js';
 import type { RowDataPacket } from '../../db/types.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
@@ -13,7 +14,7 @@ import {
   findUserByEmail,
 } from '../users/users.service.js';
 import { createEmailCode, normalizeEmail } from '../auth/email-codes.js';
-import { codeEmailTemplate, isEmailConfigured, sendEmail } from '../mail/mailer.js';
+import { isEmailConfigured, sendEmail } from '../mail/mailer.js';
 
 /**
  * Cadastro feito pela clínica: a clínica registra o pet (e, se preciso, cria o acesso do
@@ -82,6 +83,44 @@ function escapeHtml(value: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * E-mail de primeiro acesso. Leva direto para a tela de primeiro acesso, com o e-mail
+ * já preenchido: pedir para usar "Esqueci minha senha" geraria um código novo e
+ * invalidaria justamente o código deste e-mail.
+ */
+function firstAccessEmailTemplate(options: { clinicName: string; email: string; code: string }) {
+  const link = `${env.appUrl}/primeiro-acesso?email=${encodeURIComponent(options.email)}`;
+
+  return `
+  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1b2320;">
+    <div style="background: #1f7a63; color: #fff; padding: 20px 24px; border-radius: 16px 16px 0 0;">
+      <h1 style="margin: 0; font-size: 20px;">🐾 PetHelp</h1>
+    </div>
+    <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
+      <h2 style="margin: 0 0 12px; font-size: 18px;">Defina sua senha do PetHelp</h2>
+      <p style="margin: 0 0 16px; color: #5f6a64;">
+        A clínica <strong>${escapeHtml(options.clinicName)}</strong> criou seu acesso com o e-mail
+        <strong>${escapeHtml(options.email)}</strong>. Use o código abaixo para criar sua senha.
+      </p>
+      <div style="font-size: 30px; font-weight: 700; letter-spacing: 6px; text-align: center; background: #e4f0eb; color: #155e4b; padding: 16px; border-radius: 12px;">${escapeHtml(
+        options.code
+      )}</div>
+      <div style="text-align: center; margin: 20px 0 8px;">
+        <a href="${link}" style="display: inline-block; background: #1f7a63; color: #fff; text-decoration: none; padding: 13px 26px; border-radius: 10px; font-weight: bold;">
+          Criar minha senha
+        </a>
+      </div>
+      <p style="margin: 12px 0 0; font-size: 13px; color: #5f6a64;">
+        Se o botão não funcionar, abra este endereço no navegador:<br />
+        <a href="${link}" style="color: #1f7a63; word-break: break-all;">${link}</a>
+      </p>
+      <p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">
+        O código expira em 7 dias. Se não reconhece esta clínica, ignore este e-mail.
+      </p>
+    </div>
+  </div>`;
 }
 
 /** E-mail com o resumo do que a clínica cadastrou, para o responsável conferir. */
@@ -449,12 +488,11 @@ router.post('/', async (req: AuthRequest, res, next) => {
         const invite = await sendEmail(
           tutorEmail,
           'Seu acesso ao PetHelp',
-          codeEmailTemplate(
-            'Defina sua senha do PetHelp',
-            `A clínica ${escapeHtml(clinic.trade_name)} criou seu acesso. Na tela de login, use "Esqueci minha senha" com o código abaixo para definir sua senha.`,
+          firstAccessEmailTemplate({
+            clinicName: clinic.trade_name,
+            email: tutorEmail,
             code,
-            'O código expira em 7 dias. Se não reconhece esta clínica, ignore este e-mail.'
-          )
+          })
         );
         inviteSent = invite.sent;
         // Sem e-mail configurado, a clínica repassa o código ao responsável na hora.

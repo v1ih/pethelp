@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+-- Momento em que a pessoa aceitou a Política de Privacidade e os Termos de Uso.
+-- Fica nulo em contas criadas por clínicas, que aceitam no primeiro acesso.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP;
 CREATE TABLE IF NOT EXISTS email_codes (
   id UUID PRIMARY KEY, email VARCHAR(180) NOT NULL, code VARCHAR(10) NOT NULL,
   purpose VARCHAR(20) NOT NULL CHECK (purpose IN ('recovery','verification')),

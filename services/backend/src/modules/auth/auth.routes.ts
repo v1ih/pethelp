@@ -96,6 +96,13 @@ router.post('/register', async (req, res, next) => {
       return;
     }
 
+    // O aceite da Política de Privacidade é exigido aqui e não só no formulário,
+    // para que o registro do consentimento valha também fora da tela do site.
+    if (body.acceptedTerms !== true) {
+      res.status(400).json({ message: 'É preciso aceitar a Política de Privacidade para criar a conta.' });
+      return;
+    }
+
     if (userType === 'tutor' && !name) {
       res.status(400).json({ message: 'name is required for tutor registration' });
       return;
@@ -126,6 +133,7 @@ router.post('/register', async (req, res, next) => {
         email,
         password_hash: passwordHash,
         user_type: userType,
+        terms_accepted_at: new Date(),
       },
       connection
     );
@@ -292,9 +300,23 @@ router.post('/password-recovery/confirm', async (req, res, next) => {
 
     await connection.beginTransaction();
     await connection.execute('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, user.id]);
+
+    // Conta criada por clínica aceita a política no primeiro acesso. COALESCE mantém
+    // um aceite anterior, para não reescrever a data em trocas de senha comuns.
+    if (req.body?.acceptedTerms === true) {
+      await connection.execute(
+        'UPDATE users SET terms_accepted_at = COALESCE(terms_accepted_at, CURRENT_TIMESTAMP) WHERE id = ?',
+        [user.id]
+      );
+    }
+
     await connection.commit();
 
-    res.json({ message: 'Senha atualizada com sucesso.' });
+    res.json({
+      message: 'Senha atualizada com sucesso.',
+      // Permite à tela de primeiro acesso saber se ainda falta o aceite.
+      termsAccepted: Boolean(user.terms_accepted_at) || req.body?.acceptedTerms === true,
+    });
   } catch (error) {
     await connection.rollback();
     next(error);

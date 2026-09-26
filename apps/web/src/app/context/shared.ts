@@ -159,6 +159,8 @@ export interface User {
 }
 
 export type RegisterPayload = {
+  /** Aceite da Política de Privacidade, exigido pela API no cadastro. */
+  acceptedTerms?: boolean;
   name?: string;
   email: string;
   password: string;

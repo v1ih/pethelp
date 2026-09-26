@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Building2, Mail, Phone, User } from 'lucide-react';
 import { getDashboardRouteForUserType, type UserType } from '../context/shared';
 import { useSession } from '../context/SessionContext';
@@ -21,6 +21,7 @@ export default function RegisterScreen() {
   const [crmv, setCrmv] = useState('');
   const [crmvUf, setCrmvUf] = useState('');
   const [specialty, setSpecialty] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -36,6 +37,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       const resolvedUserType = await register({
+        acceptedTerms,
         name: userType === 'clinic' ? undefined : name,
         email,
         password,
@@ -251,7 +253,28 @@ export default function RegisterScreen() {
             />
           </div>
 
-          <button type="submit" disabled={loading} className="auth-button-primary">
+          <label
+            htmlFor="acceptedTerms"
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 12, fontSize: 15, lineHeight: 1.5, cursor: 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              id="acceptedTerms"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              style={{ width: 20, height: 20, marginTop: 2, flexShrink: 0, accentColor: '#7fa26a' }}
+              required
+            />
+            <span>
+              Li e concordo com a{' '}
+              <Link to="/privacidade" target="_blank" className="auth-link">
+                Política de Privacidade
+              </Link>
+              .
+            </span>
+          </label>
+
+          <button type="submit" disabled={loading || !acceptedTerms} className="auth-button-primary">
             {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
         </form>

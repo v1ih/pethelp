@@ -47,6 +47,13 @@ export const env = {
     adminDatabase: process.env.POSTGRES_ADMIN_DATABASE ?? 'postgres',
   },
   jwtSecret: process.env.JWT_SECRET ?? 'please-change-this-in-prod',
+  // Endereço público do site, usado nos links enviados por e-mail (ex.: primeiro acesso).
+  // Sem APP_URL, usa a primeira origem liberada no CORS.
+  appUrl: (
+    process.env.APP_URL?.trim() ||
+    parseOrigins(process.env.CORS_ORIGINS ?? process.env.CORS_ORIGIN)[0] ||
+    'http://localhost:5173'
+  ).replace(/\/$/, ''),
   // Envio de e-mail via Brevo (plano gratuito). Se não configurado, o código é
   // apenas registrado no log (modo desenvolvimento).
   mail: {

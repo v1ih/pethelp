@@ -297,6 +297,24 @@ export default function LoginScreen() {
                     <KeyRound size={20} />
                     Enviar código
                   </button>
+
+                  {/* Quem chegou pelo e-mail de primeiro acesso já tem um código em mãos:
+                      pedir outro aqui invalidaria justamente aquele. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!recoveryEmail.trim()) {
+                        setRecoveryMessage({ type: 'error', text: 'Digite seu e-mail para continuar.' });
+                        return;
+                      }
+                      setRecoveryMessage(null);
+                      setRecoveryStep('verify');
+                    }}
+                    className="auth-link"
+                    style={{ display: 'block', margin: '14px auto 0' }}
+                  >
+                    Já tenho um código
+                  </button>
                 </form>
               ) : null}
 

@@ -58,6 +58,8 @@ export type CreateAuthUserInput = {
   email: string;
   password_hash: string;
   user_type: UserType;
+  /** Momento do aceite da política. Nulo em contas criadas por clínicas. */
+  terms_accepted_at?: Date | null;
 };
 
 export type CreateTutorProfileInput = {
@@ -144,9 +146,9 @@ export async function createAuthUser(input: CreateAuthUserInput, db?: DbClient) 
   const id = randomUUID();
 
   await client.execute(
-    `INSERT INTO users (id, email, password_hash, user_type)
-     VALUES (?, ?, ?, ?)`,
-    [id, input.email, input.password_hash, input.user_type]
+    `INSERT INTO users (id, email, password_hash, user_type, terms_accepted_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, input.email, input.password_hash, input.user_type, input.terms_accepted_at ?? null]
   );
 
   return id;

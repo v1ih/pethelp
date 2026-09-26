@@ -163,6 +163,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         cnpj: payload.cnpj,
         connectionCode: payload.connectionCode,
         services: payload.services,
+        acceptedTerms: payload.acceptedTerms === true,
       }),
     });
 

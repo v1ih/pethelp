@@ -4,6 +4,8 @@ import { getDashboardRouteForUserType, type UserType } from './context/shared';
 import { useSession } from './context/SessionContext';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import FirstAccessScreen from './screens/FirstAccessScreen';
+import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
 import OwnerDashboardScreen from './screens/OwnerDashboardScreen';
 import ClinicDashboardScreen from './screens/ClinicDashboardScreen';
 import ClinicAgendaScreen from './screens/ClinicAgendaScreen';
@@ -123,6 +125,15 @@ export const router = createBrowserRouter([
   {
     path: '/register',
     Component: withPublicOnly(RegisterScreen),
+  },
+  {
+    path: '/primeiro-acesso',
+    Component: withPublicOnly(FirstAccessScreen),
+  },
+  {
+    // Pública de propósito: precisa abrir antes do cadastro e a partir do e-mail.
+    path: '/privacidade',
+    Component: PrivacyPolicyScreen,
   },
   {
     path: '/pet-registration',
