@@ -330,28 +330,3 @@ export async function buildPaymentsStatementPdf(options: {
     fileName: `extrato-${slugify(options.periodLabel) || 'pethelp'}.pdf`,
   };
 }
-
-/** Entrega o PDF: menu de compartilhar no celular, download no resto. */
-export async function shareOrDownloadPdf(result: { blob: Blob; fileName: string }, title: string) {
-  const file = new File([result.blob], result.fileName, { type: 'application/pdf' });
-
-  if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title });
-      return 'shared' as const;
-    } catch (error) {
-      if ((error as DOMException)?.name === 'AbortError') return 'shared' as const;
-    }
-  }
-
-  const url = URL.createObjectURL(result.blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = result.fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  window.setTimeout(() => URL.revokeObjectURL(url), 10000);
-
-  return 'downloaded' as const;
-}

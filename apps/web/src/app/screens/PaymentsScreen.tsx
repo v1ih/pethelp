@@ -8,9 +8,9 @@ import { getApiBase, getAuthHeaders } from '../context/shared';
 import {
   buildPaymentReceiptPdf,
   buildPaymentsStatementPdf,
-  shareOrDownloadPdf,
   type PaymentPdfItem,
 } from '../utils/paymentPdf';
+import { usePdfDelivery } from '../components/pdf/usePdfDelivery';
 
 // Tela de pagamentos. Clínica e veterinário lançam e controlam as cobranças;
 // o responsável vê a mesma lista em modo leitura, para conferir o que deve e o que pagou.
@@ -92,6 +92,7 @@ export default function PaymentsScreen() {
   const [clients, setClients] = useState<Client[]>([]);
   const [tutorId, setTutorId] = useState('');
   const [exporting, setExporting] = useState(false);
+  const { present: presentPdf, dialog: pdfDialog } = usePdfDelivery();
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -190,8 +191,7 @@ export default function PaymentsScreen() {
   const handleReceiptPdf = async (payment: Payment) => {
     try {
       const result = await buildPaymentReceiptPdf(toPdfItems([payment])[0]);
-      const outcome = await shareOrDownloadPdf(result, `PetHelp — ${payment.description}`);
-      if (outcome === 'downloaded') toast.success('PDF gerado.');
+      presentPdf(result, `PetHelp — ${payment.description}`, `${payment.status === 'paid' ? 'Recibo' : 'Cobrança'} · ${payment.amountLabel}`);
     } catch (error) {
       console.error('Falha ao gerar o PDF do pagamento:', error);
       toast.error('Não foi possível gerar o PDF.');
@@ -208,8 +208,7 @@ export default function PaymentsScreen() {
         ownerLabel: (isTutor ? user?.name : user?.clinicName || user?.name) ?? 'PetHelp',
         forTutor: isTutor,
       });
-      const outcome = await shareOrDownloadPdf(result, `PetHelp — extrato ${periodLabel}`);
-      if (outcome === 'downloaded') toast.success('Extrato em PDF gerado.');
+      presentPdf(result, `PetHelp — extrato ${periodLabel}`, `Extrato · ${periodLabel}`);
     } catch (error) {
       console.error('Falha ao gerar o extrato:', error);
       toast.error('Não foi possível gerar o extrato.');
@@ -652,6 +651,8 @@ export default function PaymentsScreen() {
           ))}
         </div>
       )}
+
+      {pdfDialog}
     </div>
   );
 

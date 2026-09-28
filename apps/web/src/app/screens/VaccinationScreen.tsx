@@ -8,7 +8,8 @@ import { useAppNavigation } from '../navigation';
 import { TutorShell } from '../components/layout/TutorShell';
 import { useSession } from '../context/SessionContext';
 import { fileToCompressedDataUrl } from '../utils/image';
-import { shareOrDownloadVaccinationCard } from '../utils/vaccinationCardPdf';
+import { buildVaccinationCardPdf } from '../utils/vaccinationCardPdf';
+import { usePdfDelivery } from '../components/pdf/usePdfDelivery';
 
 export default function VaccinationScreen() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function VaccinationScreen() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const { present: presentPdf, dialog: pdfDialog } = usePdfDelivery();
   // Vacina cuja foto está aberta em tela cheia.
   const [photoInView, setPhotoInView] = useState<{ name: string; photo: string } | null>(null);
 
@@ -48,14 +50,13 @@ export default function VaccinationScreen() {
     if (exporting) return;
     setExporting(true);
     try {
-      const result = await shareOrDownloadVaccinationCard({
+      const result = await buildVaccinationCardPdf({
         pet: currentPet,
         vaccines: petVaccines,
         tutorName: user?.name ?? null,
       });
-      if (result === 'downloaded') {
-        toast.success('Carteirinha em PDF baixada.');
-      }
+      // A pessoa escolhe o que fazer: ver, baixar ou compartilhar.
+      presentPdf(result, `Carteira de vacinação de ${currentPet.name}`, `Carteira de vacinação de ${currentPet.name}`);
     } catch (error) {
       console.error('Falha ao gerar a carteirinha em PDF:', error);
       toast.error('Não foi possível gerar a carteirinha em PDF.');
@@ -298,6 +299,8 @@ export default function VaccinationScreen() {
           </div>
         )}
       </div>
+
+      {pdfDialog}
 
       {photoInView ? (
         <div
