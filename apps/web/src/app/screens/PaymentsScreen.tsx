@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleDollarSign, Plus, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
+import { CheckCircle2, CircleDollarSign, FileDown, FileText, Plus, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfessionalShell } from '../components/layout/ProfessionalShell';
 import { TutorShell } from '../components/layout/TutorShell';
 import { useSession } from '../context/SessionContext';
-import { usePets } from '../context/PetsContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
+import {
+  buildPaymentReceiptPdf,
+  buildPaymentsStatementPdf,
+  shareOrDownloadPdf,
+  type PaymentPdfItem,
+} from '../utils/paymentPdf';
 
 // Tela de pagamentos. Clínica e veterinário lançam e controlam as cobranças;
 // o responsável vê a mesma lista em modo leitura, para conferir o que deve e o que pagou.
@@ -18,6 +23,7 @@ type Payment = {
   petName: string | null;
   tutorName: string | null;
   tutorEmail: string | null;
+  professionalName: string | null;
   description: string;
   amountCents: number;
   amountLabel: string;
@@ -28,6 +34,15 @@ type Payment = {
   paidAt: string | null;
   notes: string | null;
   createdAt: string;
+};
+
+/** Responsável atendido pelo profissional, com os pets dele. */
+type Client = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  pets: Array<{ id: string; name: string; species: string | null }>;
 };
 
 const METHODS = [
@@ -66,13 +81,17 @@ function formatDay(value: string | null) {
 
 export default function PaymentsScreen() {
   const { user } = useSession();
-  const { pets } = usePets();
   const API_BASE = getApiBase();
 
   const isTutor = user?.userType === 'owner';
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | PaymentStatus>('all');
+  // Competência no formato YYYY-MM; vazio = todos os meses.
+  const [month, setMonth] = useState('');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [tutorId, setTutorId] = useState('');
+  const [exporting, setExporting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -87,7 +106,8 @@ export default function PaymentsScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/api/payments`, { headers: getAuthHeaders() });
+      const query = month ? `?month=${month}` : '';
+      const resp = await fetch(`${API_BASE}/api/payments${query}`, { headers: getAuthHeaders() });
       const payload = await resp.json().catch(() => null);
       if (!resp.ok) throw new Error(payload?.message ?? 'Não foi possível carregar os pagamentos.');
       setPayments((payload?.data ?? []) as Payment[]);
@@ -96,16 +116,107 @@ export default function PaymentsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, [API_BASE, month]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // A lista de responsáveis (com os pets de cada um) só interessa a quem lança cobrança.
+  useEffect(() => {
+    if (isTutor) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/api/payments/clients`, { headers: getAuthHeaders() });
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        if (!cancelled) setClients((payload?.data ?? []) as Client[]);
+      } catch {
+        // Sem a lista, o formulário ainda funciona sem vincular pet.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [API_BASE, isTutor]);
+
   const visible = useMemo(
     () => (filter === 'all' ? payments : payments.filter((item) => item.status === filter)),
     [payments, filter]
   );
+
+  const selectedClient = useMemo(() => clients.find((client) => client.id === tutorId) ?? null, [clients, tutorId]);
+
+  /** Últimos 12 meses + o mês atual, para o seletor de competência. */
+  const monthOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    const now = new Date();
+    for (let index = 0; index < 13; index += 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      options.push({
+        value,
+        label: date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+      });
+    }
+    return options;
+  }, []);
+
+  const periodLabel = month
+    ? monthOptions.find((option) => option.value === month)?.label ?? month
+    : 'Todo o período';
+
+  const toPdfItems = (items: Payment[]): PaymentPdfItem[] =>
+    items.map((item) => ({
+      id: item.id,
+      description: item.description,
+      amountCents: item.amountCents,
+      amountLabel: item.amountLabel,
+      status: item.status,
+      method: item.method,
+      methodLabel: item.methodLabel,
+      petName: item.petName,
+      tutorName: item.tutorName,
+      professionalName: item.professionalName,
+      dueDate: item.dueDate,
+      paidAt: item.paidAt,
+      notes: item.notes,
+      createdAt: item.createdAt,
+    }));
+
+  const handleReceiptPdf = async (payment: Payment) => {
+    try {
+      const result = await buildPaymentReceiptPdf(toPdfItems([payment])[0]);
+      const outcome = await shareOrDownloadPdf(result, `PetHelp — ${payment.description}`);
+      if (outcome === 'downloaded') toast.success('PDF gerado.');
+    } catch (error) {
+      console.error('Falha ao gerar o PDF do pagamento:', error);
+      toast.error('Não foi possível gerar o PDF.');
+    }
+  };
+
+  const handleStatementPdf = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const result = await buildPaymentsStatementPdf({
+        payments: toPdfItems(visible),
+        periodLabel,
+        ownerLabel: (isTutor ? user?.name : user?.clinicName || user?.name) ?? 'PetHelp',
+        forTutor: isTutor,
+      });
+      const outcome = await shareOrDownloadPdf(result, `PetHelp — extrato ${periodLabel}`);
+      if (outcome === 'downloaded') toast.success('Extrato em PDF gerado.');
+    } catch (error) {
+      console.error('Falha ao gerar o extrato:', error);
+      toast.error('Não foi possível gerar o extrato.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const totals = useMemo(
     () => ({
@@ -119,6 +230,7 @@ export default function PaymentsScreen() {
     setDescription('');
     setAmount('');
     setPetId('');
+    setTutorId('');
     setMethod('');
     setDueDate('');
     setNotes('');
@@ -215,6 +327,36 @@ export default function PaymentsScreen() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex-1">
+          <label htmlFor="paymentsMonth" className="mb-2 block text-sm text-foreground">
+            Mês
+          </label>
+          <select
+            id="paymentsMonth"
+            value={month}
+            onChange={(event) => setMonth(event.target.value)}
+            className={`${inputClass} first-letter:uppercase`}
+          >
+            <option value="">Todo o período</option>
+            {monthOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleStatementPdf()}
+          disabled={exporting}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+        >
+          <FileText className="h-5 w-5" />
+          {exporting ? 'Gerando...' : 'Extrato em PDF'}
+        </button>
+      </div>
+
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
         {(['all', 'pending', 'paid', 'cancelled'] as const).map((value) => (
           <button
@@ -275,21 +417,60 @@ export default function PaymentsScreen() {
                 />
               </div>
               <div>
-                <label htmlFor="paymentPet" className="mb-2 block text-foreground">
-                  Pet
+                <label htmlFor="paymentTutor" className="mb-2 block text-foreground">
+                  Responsável
                 </label>
-                <select id="paymentPet" value={petId} onChange={(event) => setPetId(event.target.value)} className={inputClass}>
-                  <option value="">Sem vincular a um pet</option>
-                  {pets.map((pet) => (
-                    <option key={pet.id} value={pet.id}>
-                      {pet.name}
+                <select
+                  id="paymentTutor"
+                  value={tutorId}
+                  onChange={(event) => {
+                    setTutorId(event.target.value);
+                    // Trocou de pessoa: o pet escolhido antes não vale mais.
+                    setPetId('');
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Selecione o responsável</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name} ({client.email})
                     </option>
                   ))}
                 </select>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Vincular o pet permite avisar o responsável por e-mail.
-                </p>
+                {clients.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Nenhum responsável atendido ainda. Você pode lançar a cobrança sem vincular.
+                  </p>
+                ) : null}
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="paymentPet" className="mb-2 block text-foreground">
+                Pet
+              </label>
+              <select
+                id="paymentPet"
+                value={petId}
+                onChange={(event) => setPetId(event.target.value)}
+                className={inputClass}
+                disabled={!selectedClient}
+              >
+                <option value="">
+                  {selectedClient ? 'Selecione o pet' : 'Escolha o responsável primeiro'}
+                </option>
+                {(selectedClient?.pets ?? []).map((pet) => (
+                  <option key={pet.id} value={pet.id}>
+                    {pet.name}
+                    {pet.species ? ` · ${pet.species}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selectedClient && selectedClient.pets.length > 1
+                  ? `${selectedClient.name} tem ${selectedClient.pets.length} pets — escolha de qual é o atendimento.`
+                  : 'Vincular o pet permite avisar o responsável por e-mail.'}
+              </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -392,8 +573,9 @@ export default function PaymentsScreen() {
                 <div className="min-w-0">
                   <p className="text-base font-medium text-foreground">{payment.description}</p>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {[payment.petName, isTutor ? null : payment.tutorName].filter(Boolean).join(' · ') ||
-                      'Sem pet vinculado'}
+                    {[payment.petName, isTutor ? payment.professionalName : payment.tutorName]
+                      .filter(Boolean)
+                      .join(' · ') || 'Sem pet vinculado'}
                   </p>
                 </div>
                 <div className="text-right">
@@ -411,6 +593,17 @@ export default function PaymentsScreen() {
               </div>
 
               {payment.notes ? <p className="mt-2 text-sm text-muted-foreground">{payment.notes}</p> : null}
+
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-3">
+                <button
+                  type="button"
+                  onClick={() => void handleReceiptPdf(payment)}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  <FileDown className="h-4 w-4" />
+                  {payment.status === 'paid' ? 'Recibo em PDF' : 'Cobrança em PDF'}
+                </button>
+              </div>
 
               {!isTutor ? (
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-border/70 pt-3">

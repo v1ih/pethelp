@@ -48,6 +48,7 @@ type PaymentRow = RowDataPacket & {
   tutor_name?: string | null;
   tutor_email?: string | null;
   tutor_user_id?: string | null;
+  professional_name?: string | null;
 };
 
 type Professional = {
@@ -124,6 +125,7 @@ function normalizePayment(row: PaymentRow) {
     tutorId: row.tutor_id,
     tutorName: row.tutor_name ?? null,
     tutorEmail: row.tutor_email ?? null,
+    professionalName: row.professional_name ?? null,
     appointmentId: row.appointment_id,
     description: row.description,
     amountCents: Number(row.amount_cents),
@@ -139,11 +141,14 @@ function normalizePayment(row: PaymentRow) {
 }
 
 const SELECT_PAYMENT = `
-  SELECT p.*, pet.name AS pet_name, t.name AS tutor_name, u.email AS tutor_email, t.user_id AS tutor_user_id
+  SELECT p.*, pet.name AS pet_name, t.name AS tutor_name, u.email AS tutor_email, t.user_id AS tutor_user_id,
+         COALESCE(c.trade_name, v.name) AS professional_name
   FROM payments p
   LEFT JOIN pets pet ON pet.id = p.pet_id
   LEFT JOIN tutors t ON t.id = p.tutor_id
   LEFT JOIN users u ON u.id = t.user_id
+  LEFT JOIN clinics c ON c.id = p.clinic_id
+  LEFT JOIN veterinarians v ON v.id = p.veterinarian_id
 `;
 
 async function loadPaymentById(paymentId: string) {
@@ -248,6 +253,75 @@ async function notifyTutor(row: PaymentRow, kind: 'created' | 'paid', profession
   }
 }
 
+/**
+ * Responsáveis que o profissional atende, cada um com seus pets. É o que permite
+ * escolher primeiro a pessoa e depois o animal — dois pets podem ter o mesmo nome, e
+ * quem tem vários pets precisa aparecer uma vez só.
+ */
+router.get('/clients', async (req: AuthRequest, res, next) => {
+  try {
+    const professional = await resolveProfessional(req.user);
+    if (!professional) {
+      res.status(403).json({ message: 'Apenas clínicas e veterinários podem ver esta lista.' });
+      return;
+    }
+
+    // Clínica: pets vinculados ou cadastrados por ela. Veterinário: pets que ele
+    // cadastrou ou para os quais tem um Vet-Pass válido.
+    const where =
+      professional.kind === 'clinic'
+        ? '(p.linked_clinic_id = ? OR p.registered_by_clinic_id = ?)'
+        : `(p.registered_by_veterinarian_id = ? OR EXISTS (
+             SELECT 1 FROM vet_passes vp
+             WHERE vp.pet_id = p.id AND vp.redeemed_by_user_id = ? AND vp.expires_at >= CURRENT_TIMESTAMP
+           ))`;
+    const params =
+      professional.kind === 'clinic'
+        ? [professional.id, professional.id]
+        : [professional.id, professional.userId];
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `
+        SELECT t.id AS tutor_id, t.name AS tutor_name, u.email AS tutor_email, t.phone AS tutor_phone,
+               p.id AS pet_id, p.name AS pet_name, p.species AS pet_species
+        FROM pets p
+        JOIN tutors t ON t.id = p.current_tutor_id
+        JOIN users u ON u.id = t.user_id
+        WHERE ${where} AND p.is_active = TRUE
+        ORDER BY t.name ASC, p.name ASC
+      `,
+      params
+    );
+
+    const byTutor = new Map<
+      string,
+      { id: string; name: string; email: string; phone: string | null; pets: Array<{ id: string; name: string; species: string | null }> }
+    >();
+
+    for (const row of rows) {
+      const tutorId = String(row.tutor_id);
+      if (!byTutor.has(tutorId)) {
+        byTutor.set(tutorId, {
+          id: tutorId,
+          name: String(row.tutor_name),
+          email: String(row.tutor_email),
+          phone: (row.tutor_phone as string) ?? null,
+          pets: [],
+        });
+      }
+      byTutor.get(tutorId)!.pets.push({
+        id: String(row.pet_id),
+        name: String(row.pet_name),
+        species: (row.pet_species as string) ?? null,
+      });
+    }
+
+    res.json({ data: [...byTutor.values()] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /** Lista as cobranças: do profissional logado, ou as do responsável logado. */
 router.get('/', async (req: AuthRequest, res, next) => {
   try {
@@ -275,6 +349,13 @@ router.get('/', async (req: AuthRequest, res, next) => {
     if (['pending', 'paid', 'cancelled'].includes(status)) {
       filters.push('p.status = ?');
       values.push(status);
+    }
+
+    // Filtro por competência: 'YYYY-MM' devolve o que foi lançado naquele mês.
+    const month = asTrimmedString(req.query.month, 7);
+    if (/^\d{4}-\d{2}$/.test(month)) {
+      filters.push(`p.created_at >= ?::date AND p.created_at < (?::date + INTERVAL '1 month')`);
+      values.push(`${month}-01`, `${month}-01`);
     }
 
     const [rows] = await pool.query<PaymentRow[]>(
@@ -345,7 +426,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
         return;
       }
 
-      tutorId = tutorId ?? (pet.current_tutor_id ? String(pet.current_tutor_id) : null);
+      // O responsável cobrado é sempre o do pet: evita cobrança presa à pessoa errada
+      // se a tela mandar um par pet/responsável desencontrado.
+      tutorId = pet.current_tutor_id ? String(pet.current_tutor_id) : tutorId;
     }
 
     const id = randomUUID();
