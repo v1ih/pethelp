@@ -440,8 +440,10 @@ async function listAppointmentsForUser(user: AuthRequest['user']) {
 /** Dados de contato do responsável e do profissional envolvidos na consulta. */
 async function loadAppointmentContacts(appointment: AppointmentRow) {
   const [tutorRows] = await pool.query<RowDataPacket[]>(
+    // LEFT: responsável cadastrado sem e-mail não tem conta, e a consulta dele existe
+    // do mesmo jeito — só não há para onde mandar aviso.
     `SELECT t.name, t.phone, t.user_id, u.email
-     FROM tutors t JOIN users u ON u.id = t.user_id
+     FROM tutors t LEFT JOIN users u ON u.id = t.user_id
      WHERE t.id = ? LIMIT 1`,
     [appointment.tutor_id]
   );
@@ -450,7 +452,7 @@ async function loadAppointmentContacts(appointment: AppointmentRow) {
   const tutor: AppointmentContact | null = tutorRow
     ? {
         kind: 'tutor',
-        userId: String(tutorRow.user_id),
+        userId: tutorRow.user_id ? String(tutorRow.user_id) : null,
         name: String(tutorRow.name),
         email: (tutorRow.email as string) ?? null,
         phone: (tutorRow.phone as string) ?? null,
@@ -550,7 +552,8 @@ function appointmentEmailTemplate(options: {
 async function notifyTutorAboutNewAppointment(appointment: AppointmentRow, actorType: 'clinic' | 'veterinarian') {
   try {
     const { tutor, professional } = await loadAppointmentContacts(appointment);
-    if (!tutor) return;
+    // Responsável sem conta no app: a clínica avisa pessoalmente, não há para onde mandar.
+    if (!tutor?.userId) return;
 
     const quando = `${new Date(`${formatDate(appointment.appointment_date)}T00:00:00`).toLocaleDateString('pt-BR')} às ${String(
       appointment.appointment_time

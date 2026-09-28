@@ -154,7 +154,8 @@ export async function createAuthUser(input: CreateAuthUserInput, db?: DbClient) 
   return id;
 }
 
-export async function createTutorProfile(userId: string, input: CreateTutorProfileInput, db?: DbClient) {
+/** `userId` nulo = responsável cadastrado pela clínica que ainda não tem conta no app. */
+export async function createTutorProfile(userId: string | null, input: CreateTutorProfileInput, db?: DbClient) {
   const client = getDbClient(db);
   const id = randomUUID();
 

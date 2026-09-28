@@ -909,16 +909,18 @@ type GuardianRow = RowDataPacket & {
 async function loadPetGuardians(petId: string) {
   const [rows] = await pool.query<GuardianRow[]>(
     `
+      -- LEFT nos users: responsável cadastrado pela clínica sem e-mail não tem conta,
+      -- mas continua sendo o responsável pelo pet.
       SELECT t.id AS tutor_id, t.name AS name, u.email AS email, TRUE AS is_primary
       FROM pets p
       JOIN tutors t ON t.id = p.current_tutor_id
-      JOIN users u ON u.id = t.user_id
+      LEFT JOIN users u ON u.id = t.user_id
       WHERE p.id = ?
       UNION ALL
       SELECT t.id AS tutor_id, t.name AS name, u.email AS email, FALSE AS is_primary
       FROM pet_guardians g
       JOIN tutors t ON t.id = g.tutor_id
-      JOIN users u ON u.id = t.user_id
+      LEFT JOIN users u ON u.id = t.user_id
       WHERE g.pet_id = ?
       ORDER BY is_primary DESC, name ASC
     `,

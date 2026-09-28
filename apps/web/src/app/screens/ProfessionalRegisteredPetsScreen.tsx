@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { History, Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff } from 'lucide-react';
+import { History, Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfessionalShell } from '../components/layout/ProfessionalShell';
 import PetAuditTrail from '../components/audit/PetAuditTrail';
@@ -32,6 +32,8 @@ type RegisteredPet = {
     email: string | null;
     phone: string | null;
     emailVerified: boolean;
+    /** False quando o responsável foi cadastrado sem e-mail e não tem acesso ao app. */
+    hasAccount?: boolean;
   };
   vetPass: { code: string; expiresAt: string | null; active: boolean } | null;
 };
@@ -65,6 +67,11 @@ export default function ProfessionalRegisteredPetsScreen() {
   const [search, setSearch] = useState('');
   // Pet cujo histórico de alterações está aberto.
   const [auditPet, setAuditPet] = useState<{ id: string; name: string } | null>(null);
+  // Responsável sem conta para quem a clínica vai criar o acesso.
+  const [inviteTutor, setInviteTutor] = useState<{ id: string; name: string } | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +92,42 @@ export default function ProfessionalRegisteredPetsScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Cria a conta do responsável que foi cadastrado sem e-mail e envia o código. */
+  const handleInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!inviteTutor || inviting) return;
+
+    const email = inviteEmail.trim();
+    if (!email) {
+      toast.error('Informe o e-mail do responsável.');
+      return;
+    }
+
+    setInviting(true);
+    try {
+      const resp = await fetch(`${API_BASE}/api/pet-registrations/tutors/${inviteTutor.id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ email }),
+      });
+      const payload = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error(payload?.message ?? 'Não foi possível criar o acesso.');
+
+      toast.success(payload?.message ?? 'Acesso criado.');
+      // Sem e-mail configurado no servidor, o código aparece para a clínica repassar.
+      setInviteCode(payload?.data?.accessCode ?? null);
+      if (!payload?.data?.accessCode) {
+        setInviteTutor(null);
+        setInviteEmail('');
+      }
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível criar o acesso.');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   // A busca é local: a lista já vem completa e assim o filtro responde na hora.
   const filtered = useMemo(() => {
@@ -178,10 +221,17 @@ export default function ProfessionalRegisteredPetsScreen() {
               {filtered.map((pet) => {
                 const registered = formatDate(pet.registeredAt);
                 const passExpires = formatDate(pet.vetPass?.expiresAt ?? null);
-                // Pet vinculado pelo responsável não tem Vet-Pass: o acesso vem do
-                // próprio vínculo, então é ele que diz se a clínica ainda acompanha.
+                // De onde vem o acesso muda por perfil e por origem do pet:
+                // - veterinário: sempre pelo Vet-Pass, que o responsável encerra;
+                // - clínica que cadastrou o pet: pelo próprio cadastro, que não expira;
+                // - clínica com pet vinculado por código: pelo vínculo, que o responsável desfaz.
                 const linkedByTutor = pet.origin === 'linked';
-                const sharing = linkedByTutor ? pet.stillLinked : Boolean(pet.vetPass?.active);
+                const registeredHere = !isVet && pet.origin !== 'linked';
+                const sharing = isVet
+                  ? Boolean(pet.vetPass?.active)
+                  : linkedByTutor
+                    ? pet.stillLinked
+                    : true;
 
                 return (
                   <article
@@ -216,9 +266,11 @@ export default function ProfessionalRegisteredPetsScreen() {
                               ? sharing
                                 ? 'Vínculo ativo'
                                 : 'Vínculo encerrado'
-                              : sharing
-                                ? 'Vet-Pass ativo'
-                                : 'Compartilhamento encerrado'}
+                              : registeredHere
+                                ? 'Cadastrado pela clínica'
+                                : sharing
+                                  ? 'Vet-Pass ativo'
+                                  : 'Compartilhamento encerrado'}
                           </span>
                           {linkedByTutor ? (
                             <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
@@ -272,11 +324,31 @@ export default function ProfessionalRegisteredPetsScreen() {
                           </a>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {pet.tutor.emailVerified
-                          ? 'Responsável já confirmou o e-mail e acessa o app.'
-                          : 'Responsável ainda não confirmou o e-mail.'}
-                      </p>
+                      {/* Responsável sem conta: cadastrado sem e-mail. A clínica pode
+                          criar o acesso depois, quando a pessoa tiver um e-mail. */}
+                      {pet.tutor.hasAccount === false ? (
+                        <div className="mt-3 border-t border-border pt-3">
+                          <p className="text-xs text-muted-foreground">
+                            Sem e-mail: este responsável não acessa o app. O cadastro fica aqui no sistema.
+                          </p>
+                          {pet.tutor.id ? (
+                            <button
+                              type="button"
+                              onClick={() => setInviteTutor({ id: pet.tutor.id as string, name: pet.tutor.name ?? 'responsável' })}
+                              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-[16px] border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                            >
+                              <Mail className="h-4 w-4" />
+                              Enviar acesso por e-mail
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          {pet.tutor.emailVerified
+                            ? 'Responsável já confirmou o e-mail e acessa o app.'
+                            : 'Responsável ainda não confirmou o e-mail.'}
+                        </p>
+                      )}
                     </div>
 
                     <button
@@ -299,6 +371,11 @@ export default function ProfessionalRegisteredPetsScreen() {
                           ? 'O responsável vinculou este pet à clínica com o código de conexão, e pode encerrar o vínculo quando quiser.'
                           : 'O responsável encerrou o vínculo deste pet com a clínica.'}
                       </p>
+                    ) : registeredHere ? (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Foi a clínica que cadastrou este pet, e por isso acompanha o prontuário, as vacinas e os
+                        exames deste atendimento.
+                      </p>
                     ) : (
                       <p className="mt-3 text-xs text-muted-foreground">
                         O responsável encerrou o compartilhamento deste pet.
@@ -314,6 +391,84 @@ export default function ProfessionalRegisteredPetsScreen() {
 
       {auditPet ? (
         <PetAuditTrail petId={auditPet.id} petName={auditPet.name} onClose={() => setAuditPet(null)} />
+      ) : null}
+
+      {inviteTutor ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enviar acesso ao responsável"
+          onClick={() => {
+            setInviteTutor(null);
+            setInviteEmail('');
+            setInviteCode(null);
+          }}
+        >
+          <div
+            className="w-full rounded-t-[28px] border border-border bg-card p-5 shadow-2xl sm:max-w-[460px] sm:rounded-[28px] sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-medium text-foreground">Enviar acesso</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Cria a conta de {inviteTutor.name} no PetHelp e envia o código para definir a senha.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Fechar"
+                onClick={() => {
+                  setInviteTutor(null);
+                  setInviteEmail('');
+                  setInviteCode(null);
+                }}
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {inviteCode ? (
+              <div className="mt-4 rounded-[20px] border border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="text-sm text-muted-foreground">Código de primeiro acesso</p>
+                <p className="mt-2 font-mono text-2xl tracking-[0.3em] text-foreground">{inviteCode}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Passe este código ao responsável: ele usa em "Esqueci minha senha", na tela de login.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleInvite} className="mt-4 space-y-4">
+                <div>
+                  <label htmlFor="inviteEmail" className="mb-2 block text-foreground">
+                    E-mail do responsável
+                  </label>
+                  <input
+                    id="inviteEmail"
+                    type="email"
+                    inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    placeholder="ana@email.com"
+                    className="min-h-12 w-full rounded-[18px] border border-border bg-input-background px-4 py-3 text-base text-foreground outline-none transition-colors focus:border-primary"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={inviting}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+                >
+                  <Mail className="h-5 w-5" />
+                  {inviting ? 'Criando...' : 'Criar acesso e enviar'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       ) : null}
     </ProfessionalShell>
   );

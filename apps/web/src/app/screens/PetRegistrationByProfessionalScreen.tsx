@@ -12,15 +12,18 @@ type RegistrationResult = {
   petName: string;
   tutor: {
     id: string;
-    userId: string;
+    userId: string | null;
     name: string;
-    email: string;
+    email: string | null;
     isNewAccount: boolean;
+    /** False quando o responsável foi cadastrado sem e-mail e ainda não tem conta. */
+    hasAccount: boolean;
   };
+  // Só o veterinário autônomo recebe Vet-Pass: a clínica acessa pelo próprio cadastro.
   vetPass: {
     code: string;
     expiresAt: string;
-  };
+  } | null;
   summaryEmailSent: boolean;
   inviteEmailSent: boolean;
   emailConfigured: boolean;
@@ -120,7 +123,8 @@ export default function PetRegistrationByProfessionalScreen() {
         body: JSON.stringify({
           tutor: {
             name: tutorName.trim(),
-            email: tutorEmail.trim(),
+            // Vazio = responsável sem conta: o cadastro fica só no sistema da clínica.
+            email: tutorEmail.trim() || null,
             phone: tutorPhone.trim() || null,
             cpf: tutorCpf.trim() || null,
           },
@@ -151,8 +155,13 @@ export default function PetRegistrationByProfessionalScreen() {
         throw new Error(payload?.message ?? 'Não foi possível concluir o cadastro.');
       }
 
-      setResult(payload.data as RegistrationResult);
-      toast.success('Cadastro concluído e informações enviadas ao responsável.');
+      const created = payload.data as RegistrationResult;
+      setResult(created);
+      toast.success(
+        created.tutor.hasAccount === false
+          ? 'Pet cadastrado. Repasse as informações ao responsável.'
+          : 'Cadastro concluído e informações enviadas ao responsável.'
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível concluir o cadastro.');
     } finally {
@@ -164,8 +173,12 @@ export default function PetRegistrationByProfessionalScreen() {
     return (
       <ProfessionalShell
         active="registration"
-        title="Cadastro enviado ao responsável"
-        description={`O responsável recebeu as informações e o pet já está ${isVet ? 'sob seu acompanhamento' : 'vinculado à clínica'}.`}
+        title={result.tutor.hasAccount === false ? 'Pet cadastrado' : 'Cadastro enviado ao responsável'}
+        description={
+          result.tutor.hasAccount === false
+            ? `Pet cadastrado e já ${isVet ? 'sob seu acompanhamento' : 'vinculado à clínica'}. Repasse as informações ao responsável.`
+            : `O responsável recebeu as informações e o pet já está ${isVet ? 'sob seu acompanhamento' : 'vinculado à clínica'}.`
+        }
       >
         <div className="mx-auto max-w-2xl space-y-4">
           <div className="rounded-[28px] border border-primary/30 bg-primary/5 p-5 sm:p-6">
@@ -177,27 +190,49 @@ export default function PetRegistrationByProfessionalScreen() {
                 <p className="text-base font-medium text-foreground">
                   {result.petName} cadastrado para {result.tutor.name}
                 </p>
-                <p className="mt-1 break-words text-sm text-muted-foreground">{result.tutor.email}</p>
+                <p className="mt-1 break-words text-sm text-muted-foreground">
+                  {result.tutor.email ?? 'Responsável sem e-mail'}
+                </p>
               </div>
             </div>
 
             <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                Notificação criada no app do responsável.
-              </li>
-              <li className="flex items-start gap-2">
-                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                {result.summaryEmailSent
-                  ? 'Resumo dos dados e aviso do compartilhamento enviados por e-mail.'
-                  : 'E-mail não configurado no servidor: repasse as informações ao responsável.'}
-              </li>
+              {/* Sem conta não há app do responsável: não prometa aviso que não existe. */}
+              {result.tutor.hasAccount === false ? (
+                <li className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  Cadastro guardado no sistema da clínica. O responsável não tem acesso ao app por enquanto — em
+                  "Pets cadastrados" você envia o acesso quando ele tiver um e-mail.
+                </li>
+              ) : (
+                <>
+                  <li className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    Notificação criada no app do responsável.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {result.summaryEmailSent
+                      ? 'Resumo dos dados e aviso do compartilhamento enviados por e-mail.'
+                      : 'E-mail não configurado no servidor: repasse as informações ao responsável.'}
+                  </li>
+                </>
+              )}
               <li className="flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                Vet-Pass <strong className="font-mono">{result.vetPass.code}</strong> criado:{' '}
-                {isVet ? 'você acompanha' : 'a clínica acompanha'} prontuário, vacinas e exames até{' '}
-                {new Date(result.vetPass.expiresAt).toLocaleDateString('pt-BR')}. O responsável vê esse
-                compartilhamento em "Compartilhamentos" e pode encerrá-lo quando quiser.
+                {result.vetPass ? (
+                  <span>
+                    Vet-Pass <strong className="font-mono">{result.vetPass.code}</strong> criado:{' '}
+                    {isVet ? 'você acompanha' : 'a clínica acompanha'} prontuário, vacinas e exames até{' '}
+                    {new Date(result.vetPass.expiresAt).toLocaleDateString('pt-BR')}. O responsável vê esse
+                    compartilhamento em "Compartilhamentos" e pode encerrá-lo quando quiser.
+                  </span>
+                ) : (
+                  <span>
+                    A clínica acompanha prontuário, vacinas e exames deste pet pelo próprio cadastro. O responsável
+                    continua decidindo o que compartilhar com outras clínicas e veterinários.
+                  </span>
+                )}
               </li>
               {result.tutor.isNewAccount ? (
                 <li className="flex items-start gap-2">
@@ -292,7 +327,7 @@ export default function PetRegistrationByProfessionalScreen() {
 
             <div>
               <label htmlFor="tutorEmail" className="mb-2 block text-foreground">
-                E-mail <span className="text-destructive">*</span>
+                E-mail <span className="text-muted-foreground">(opcional)</span>
               </label>
               <input
                 id="tutorEmail"
@@ -304,10 +339,11 @@ export default function PetRegistrationByProfessionalScreen() {
                 onChange={(event) => setTutorEmail(event.target.value)}
                 className={inputClass}
                 placeholder="ana@email.com"
-                required
               />
               <p className="mt-2 text-sm text-muted-foreground">
-                É por aqui que o responsável recebe os dados e o acesso ao app.
+                {tutorEmail.trim()
+                  ? 'É por aqui que o responsável recebe os dados e o acesso ao app.'
+                  : 'Sem e-mail o cadastro funciona igual: o pet fica no sistema da clínica. Você pode enviar o acesso depois, em "Pets cadastrados", quando o responsável tiver um e-mail.'}
               </p>
             </div>
 

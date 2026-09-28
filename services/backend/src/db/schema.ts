@@ -46,6 +46,11 @@ CREATE TABLE IF NOT EXISTS clinics (
   connection_code VARCHAR(32) UNIQUE, services JSONB, working_hours JSONB,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Responsável sem conta no app: muita gente de mais idade não tem e-mail, e a clínica
+-- precisa cadastrar o pet mesmo assim. O cadastro do responsável existe sozinho; a
+-- conta só é criada quando (e se) alguém informar um e-mail depois.
+ALTER TABLE tutors ALTER COLUMN user_id DROP NOT NULL;
+
 -- Código de conexão da clínica: é o que o responsável digita para vincular o pet.
 -- Clínica sem código (cadastro antigo) não conseguia receber vínculo nenhum, e código
 -- gravado em minúsculas nunca era encontrado, porque a tela força maiúsculas.

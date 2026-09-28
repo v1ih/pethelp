@@ -304,7 +304,9 @@ router.get('/clients', async (req: AuthRequest, res, next) => {
                p.id AS pet_id, p.name AS pet_name, p.species AS pet_species
         FROM pets p
         JOIN tutors t ON t.id = p.current_tutor_id
-        JOIN users u ON u.id = t.user_id
+        -- LEFT: responsável cadastrado sem e-mail não tem conta, e mesmo assim precisa
+        -- aparecer para a clínica cobrar e agendar.
+        LEFT JOIN users u ON u.id = t.user_id
         WHERE ${where} AND p.is_active = TRUE
         ORDER BY t.name ASC, p.name ASC
       `,
@@ -313,7 +315,14 @@ router.get('/clients', async (req: AuthRequest, res, next) => {
 
     const byTutor = new Map<
       string,
-      { id: string; name: string; email: string; phone: string | null; pets: Array<{ id: string; name: string; species: string | null }> }
+      {
+        id: string;
+        name: string;
+        email: string | null;
+        phone: string | null;
+        hasAccount: boolean;
+        pets: Array<{ id: string; name: string; species: string | null }>;
+      }
     >();
 
     for (const row of rows) {
@@ -322,8 +331,9 @@ router.get('/clients', async (req: AuthRequest, res, next) => {
         byTutor.set(tutorId, {
           id: tutorId,
           name: String(row.tutor_name),
-          email: String(row.tutor_email),
+          email: (row.tutor_email as string) ?? null,
           phone: (row.tutor_phone as string) ?? null,
+          hasAccount: Boolean(row.tutor_email),
           pets: [],
         });
       }

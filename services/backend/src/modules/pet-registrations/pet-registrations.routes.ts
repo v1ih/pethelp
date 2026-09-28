@@ -296,7 +296,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         SELECT
           p.id, p.name, p.species, p.breed, p.age, p.weight, p.sex, p.neutered, p.photo, p.birth_date,
           p.allergies, p.conditions, p.is_active, p.created_at, p.linked_clinic_id, p.registered_by_clinic_id,
-          t.id AS tutor_id, t.name AS tutor_name, t.phone AS tutor_phone,
+          t.id AS tutor_id, t.name AS tutor_name, t.phone AS tutor_phone, t.user_id AS tutor_user_id,
           u.email AS tutor_email, u.email_verified AS tutor_email_verified,
           vp.pass_code, vp.expires_at AS pass_expires_at
         FROM pets p
@@ -353,6 +353,8 @@ router.get('/', async (req: AuthRequest, res, next) => {
             email: row.tutor_email ?? null,
             phone: row.tutor_phone ?? null,
             emailVerified: Boolean(row.tutor_email_verified),
+            // Sem conta: cadastrado sem e-mail, só existe no sistema da clínica.
+            hasAccount: Boolean(row.tutor_user_id),
           },
           vetPass: row.pass_code
             ? {
@@ -392,13 +394,16 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const petName = asTrimmedString(petBody.name);
     const petSpecies = asTrimmedString(petBody.species);
 
-    if (!tutorName || !tutorEmail) {
-      res.status(400).json({ message: 'Informe o nome e o e-mail do responsável.' });
+    if (!tutorName) {
+      res.status(400).json({ message: 'Informe o nome do responsável.' });
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tutorEmail)) {
-      res.status(400).json({ message: 'Informe um e-mail válido para o responsável.' });
+    // E-mail é opcional: parte dos responsáveis (principalmente pessoas de mais idade)
+    // não tem e-mail, e o atendimento não pode parar por causa disso. Sem e-mail, o
+    // cadastro do responsável existe só no sistema da clínica, sem conta de acesso.
+    if (tutorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tutorEmail)) {
+      res.status(400).json({ message: 'O e-mail informado não parece válido. Corrija ou deixe em branco.' });
       return;
     }
 
@@ -407,7 +412,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const existingUser = await findUserByEmail(tutorEmail);
+    const existingUser = tutorEmail ? await findUserByEmail(tutorEmail) : null;
     if (existingUser && existingUser.user_type !== 'tutor') {
       res.status(409).json({
         message: 'Este e-mail já pertence a uma conta de clínica ou veterinário. Use o e-mail pessoal do responsável.',
@@ -415,12 +420,12 @@ router.post('/', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const isNewAccount = !existingUser;
+    const isNewAccount = Boolean(tutorEmail) && !existingUser;
 
     await connection.beginTransaction();
     transactionOpen = true;
 
-    let tutorUserId: string;
+    let tutorUserId: string | null;
     let tutorProfileId: string;
     let tutorDisplayName = tutorName;
 
@@ -436,7 +441,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
       tutorUserId = existingUser.id;
       tutorProfileId = existingTutor.id;
       tutorDisplayName = existingTutor.name || tutorName;
-    } else {
+    } else if (tutorEmail) {
       // Senha aleatória inutilizável: o responsável define a dele com o código do convite.
       const placeholderPassword = await bcrypt.hash(randomUUID(), 10);
       tutorUserId = await createAuthUser(
@@ -445,6 +450,15 @@ router.post('/', async (req: AuthRequest, res, next) => {
       );
       tutorProfileId = await createTutorProfile(
         tutorUserId,
+        { name: tutorName, phone: tutorPhone, cpf: tutorCpf },
+        connection
+      );
+    } else {
+      // Responsável sem e-mail: fica só o cadastro, sem conta. A clínica pode enviar
+      // o acesso depois, quando a pessoa tiver um e-mail.
+      tutorUserId = null;
+      tutorProfileId = await createTutorProfile(
+        null,
         { name: tutorName, phone: tutorPhone, cpf: tutorCpf },
         connection
       );
@@ -500,20 +514,23 @@ router.post('/', async (req: AuthRequest, res, next) => {
       );
     }
 
-    await connection.execute(
-      `
-        INSERT INTO notifications (id, user_id, pet_id, source_key, type, title, message, notification_date)
-        VALUES (?, ?, ?, ?, 'connection', ?, ?, CURRENT_DATE)
-      `,
-      [
-        randomUUID(),
-        tutorUserId,
-        petId,
-        `clinic-registration:${petId}`,
-        'Cadastro feito pela clínica',
-        `${professional.nounCapitalized} ${professional.displayName} cadastrou ${petName} no seu perfil. Confira e complete os dados quando quiser.`,
-      ]
-    );
+    // Sem conta não há para quem notificar dentro do app.
+    if (tutorUserId) {
+      await connection.execute(
+        `
+          INSERT INTO notifications (id, user_id, pet_id, source_key, type, title, message, notification_date)
+          VALUES (?, ?, ?, ?, 'connection', ?, ?, CURRENT_DATE)
+        `,
+        [
+          randomUUID(),
+          tutorUserId,
+          petId,
+          `clinic-registration:${petId}`,
+          'Cadastro feito pela clínica',
+          `${professional.nounCapitalized} ${professional.displayName} cadastrou ${petName} no seu perfil. Confira e complete os dados quando quiser.`,
+        ]
+      );
+    }
 
     await connection.commit();
     transactionOpen = false;
@@ -536,26 +553,29 @@ router.post('/', async (req: AuthRequest, res, next) => {
     let inviteSent = false;
     let accessCode: string | null = null;
 
-    try {
-      const summary = await sendEmail(
-        tutorEmail,
-        `${petName} foi cadastrado no PetHelp por ${professional.displayName}`,
-        petSummaryEmailTemplate({
-          tutorName: tutorDisplayName,
-          professional,
-          petLines,
-          isNewAccount,
-          email: tutorEmail,
-          vetPassCode,
-          vetPassExpiresAt,
-        })
-      );
-      summarySent = summary.sent;
-    } catch (mailError) {
-      console.error('Falha ao enviar resumo do cadastro ao responsável:', mailError);
+    // Sem e-mail não há o que enviar: a clínica repassa as informações pessoalmente.
+    if (tutorEmail) {
+      try {
+        const summary = await sendEmail(
+          tutorEmail,
+          `${petName} foi cadastrado no PetHelp por ${professional.displayName}`,
+          petSummaryEmailTemplate({
+            tutorName: tutorDisplayName,
+            professional,
+            petLines,
+            isNewAccount,
+            email: tutorEmail,
+            vetPassCode,
+            vetPassExpiresAt,
+          })
+        );
+        summarySent = summary.sent;
+      } catch (mailError) {
+        console.error('Falha ao enviar resumo do cadastro ao responsável:', mailError);
+      }
     }
 
-    if (isNewAccount) {
+    if (isNewAccount && tutorEmail) {
       try {
         // Reutiliza o fluxo de recuperação de senha: o código serve para o responsável
         // definir a primeira senha em "Esqueci minha senha".
@@ -587,8 +607,11 @@ router.post('/', async (req: AuthRequest, res, next) => {
           id: tutorProfileId,
           userId: tutorUserId,
           name: tutorDisplayName,
-          email: tutorEmail,
+          email: tutorEmail || null,
           isNewAccount,
+          // Sem conta: o pet fica no sistema da clínica e o responsável não acessa o app
+          // até alguém informar um e-mail para ele.
+          hasAccount: Boolean(tutorUserId),
         },
         // A clínica acessa pelo próprio cadastro; só o veterinário autônomo recebe passe.
         vetPass: vetPassCode
@@ -619,6 +642,101 @@ router.post('/', async (req: AuthRequest, res, next) => {
     next(error);
   } finally {
     connection.release();
+  }
+});
+
+/**
+ * Cria o acesso ao app para um responsável que foi cadastrado sem e-mail. Serve para
+ * quando a pessoa passa a ter e-mail depois — ou quando um filho/neto vai acompanhar
+ * o pet pelo aplicativo. Só quem cadastrou o pet dessa pessoa pode fazer isso.
+ */
+router.post('/tutors/:tutorId/invite', async (req: AuthRequest, res, next) => {
+  try {
+    const professional = await resolveProfessional(req.user);
+    if (!professional) {
+      res.status(403).json({ message: 'Apenas clínicas e veterinários podem enviar o acesso.' });
+      return;
+    }
+
+    const tutorId = String(req.params.tutorId);
+    const email = normalizeEmail(asTrimmedString((req.body ?? {}).email));
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ message: 'Informe um e-mail válido para o responsável.' });
+      return;
+    }
+
+    const [tutorRows] = await pool.query<RowDataPacket[]>(
+      'SELECT id, user_id, name FROM tutors WHERE id = ? LIMIT 1',
+      [tutorId]
+    );
+    const tutor = tutorRows[0] as { id: string; user_id: string | null; name: string } | undefined;
+    if (!tutor) {
+      res.status(404).json({ message: 'Responsável não encontrado.' });
+      return;
+    }
+
+    if (tutor.user_id) {
+      res.status(409).json({ message: 'Este responsável já tem acesso ao app.' });
+      return;
+    }
+
+    // O profissional só convida quem ele mesmo atende.
+    const ownerColumn =
+      professional.kind === 'clinic' ? 'registered_by_clinic_id' : 'registered_by_veterinarian_id';
+    const [petRows] = await pool.query<RowDataPacket[]>(
+      `SELECT 1 FROM pets WHERE current_tutor_id = ? AND ${ownerColumn} = ? LIMIT 1`,
+      [tutorId, professional.id]
+    );
+    if (!petRows.length) {
+      res.status(403).json({ message: 'Este responsável não foi cadastrado por você.' });
+      return;
+    }
+
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      res.status(409).json({
+        message: 'Este e-mail já tem conta no PetHelp. Peça para o responsável entrar e vincular o pet pelo código da clínica.',
+      });
+      return;
+    }
+
+    const placeholderPassword = await bcrypt.hash(randomUUID(), 10);
+    const userId = await createAuthUser(
+      { email, password_hash: placeholderPassword, user_type: 'tutor' },
+      pool
+    );
+    await pool.execute('UPDATE tutors SET user_id = ? WHERE id = ?', [userId, tutorId]);
+
+    let inviteSent = false;
+    let accessCode: string | null = null;
+    try {
+      const code = await createEmailCode(email, 'recovery', INVITE_TTL_MINUTES);
+      const invite = await sendEmail(
+        email,
+        'Seu acesso ao PetHelp',
+        firstAccessEmailTemplate({ professional, email, code })
+      );
+      inviteSent = invite.sent;
+      if (!isEmailConfigured()) accessCode = code;
+    } catch (mailError) {
+      console.error('Falha ao enviar o acesso ao responsável:', mailError);
+    }
+
+    res.status(201).json({
+      data: {
+        tutorId,
+        email,
+        inviteEmailSent: inviteSent,
+        emailConfigured: isEmailConfigured(),
+        ...(accessCode ? { accessCode } : {}),
+      },
+      message: inviteSent
+        ? 'Acesso criado e código enviado por e-mail.'
+        : 'Acesso criado. Passe o código ao responsável.',
+    });
+  } catch (error) {
+    next(error);
   }
 });
 
