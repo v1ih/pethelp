@@ -17,6 +17,7 @@ export default function ConnectionScreen() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const [linkedName, setLinkedName] = useState<string | null>(null);
 
   const handleUnlink = () => {
     if (!currentPet) return;
@@ -47,14 +48,31 @@ export default function ConnectionScreen() {
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPet) return;
+
+    if (!currentPet) {
+      toast.error('Selecione um pet antes de vincular à clínica.');
+      return;
+    }
+
+    const code = clinicCode.trim().toUpperCase();
+    if (!code) {
+      toast.error('Digite o código de conexão da clínica.');
+      return;
+    }
+
     setLoading(true);
     try {
-      await linkPetToClinic(currentPet.id, clinicCode);
+      const { clinicName } = await linkPetToClinic(currentPet.id, code);
+      setLinkedName(clinicName);
       setSuccess(true);
-      setTimeout(() => { navigate(getDashboardRouteForUserType(user?.userType), { replace: true }); }, 2000);
+      toast.success(
+        clinicName ? `${currentPet.name} vinculado a ${clinicName}.` : `${currentPet.name} vinculado à clínica.`
+      );
+      setTimeout(() => { navigate(getDashboardRouteForUserType(user?.userType), { replace: true }); }, 2500);
     } catch (error) {
-      console.error('Falha na conexão:', error);
+      // Antes o erro só ia para o console: quem estava na tela não recebia resposta
+      // nenhuma e parecia que o botão não fazia nada.
+      toast.error(error instanceof Error ? error.message : 'Não foi possível vincular a clínica.');
     } finally {
       setLoading(false);
     }
@@ -68,7 +86,11 @@ export default function ConnectionScreen() {
             <Check className="h-10 w-10" />
           </div>
           <h2 className="text-2xl font-medium text-foreground mb-2">Conectado com sucesso!</h2>
-          <p className="text-muted-foreground">Seu pet agora está vinculado à clínica. Redirecionando...</p>
+          <p className="text-muted-foreground">
+            {linkedName
+              ? `${currentPet?.name || 'Seu pet'} agora está vinculado a ${linkedName}. Redirecionando...`
+              : 'Seu pet agora está vinculado à clínica. Redirecionando...'}
+          </p>
         </div>
       ) : (
         <div className="mx-auto grid max-w-3xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
@@ -119,10 +141,13 @@ export default function ConnectionScreen() {
 
       {currentPet?.linkedClinicId && (
         <div className="mx-auto mt-6 max-w-3xl rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_18px_42px_-30px_rgba(127,162,106,0.2)] sm:p-6">
-          <h3 className="mb-2 text-foreground">Vinculado Atualmente</h3>
+          <h3 className="mb-2 text-foreground">
+            {currentPet.linkedClinicName ? `Vinculado a ${currentPet.linkedClinicName}` : 'Vinculado Atualmente'}
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Este pet já possui um vínculo ativo com um estabelecimento, que por isso acompanha o prontuário, as
-            vacinas e os exames dele.
+            {currentPet.linkedClinicName
+              ? `${currentPet.name} está vinculado a ${currentPet.linkedClinicName}, que por isso acompanha o prontuário, as vacinas e os exames dele.`
+              : 'Este pet já possui um vínculo ativo com um estabelecimento, que por isso acompanha o prontuário, as vacinas e os exames dele.'}
           </p>
           <button
             type="button"

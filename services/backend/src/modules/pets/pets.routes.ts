@@ -57,6 +57,7 @@ type PetRow = RowDataPacket & {
   sex: string | null;
   neutered: boolean | null;
   birth_date: Date | string | null;
+  linked_clinic_name?: string | null;
   is_active: number | boolean;
   created_at: Date;
   updated_at: Date;
@@ -81,7 +82,8 @@ const petSelectFields = `
   birth_date,
   is_active,
   created_at,
-  updated_at
+  updated_at,
+  (SELECT c.trade_name FROM clinics c WHERE c.id = pets.linked_clinic_id) AS linked_clinic_name
 `;
 
 function parseNullableJson(value: unknown): string | null {
@@ -150,6 +152,8 @@ function normalizePet(row: PetRow) {
     currentTutorId,
     ownerId: currentTutorId,
     linkedClinicId,
+    // Nome da clínica vinculada, para o responsável saber com quem está compartilhando.
+    linkedClinicName: linkedClinicId ? row.linked_clinic_name ?? null : null,
     name: row.name,
     species: row.species,
     breed: row.breed,
@@ -687,6 +691,67 @@ petsRouter.delete('/:id', async (req: AuthRequest, res, next) => {
   }
 });
 
+/**
+ * Avisa a clínica que um responsável vinculou um pet a ela, por notificação e e-mail.
+ * Falha aqui não desfaz o vínculo: o aviso é um extra, não a operação.
+ */
+async function notifyClinicAboutNewLink(
+  clinicId: string,
+  clinicUserId: string,
+  petId: string,
+  petName: string,
+  clinicName: string
+) {
+  try {
+    await pool.execute(
+      `
+        INSERT INTO notifications (id, user_id, pet_id, source_key, type, title, message, notification_date)
+        VALUES (?, ?, ?, ?, 'connection', ?, ?, CURRENT_DATE)
+      `,
+      [
+        randomUUID(),
+        clinicUserId,
+        petId,
+        `pet-clinic-link:${petId}:${clinicId}`,
+        'Novo pet vinculado',
+        `${petName} foi vinculado à sua clínica pelo responsável. O prontuário, as vacinas e os exames já aparecem no seu painel.`,
+      ]
+    );
+
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT email FROM users WHERE id = ? LIMIT 1', [clinicUserId]);
+    const email = rows.length ? String((rows[0] as { email: string }).email) : '';
+    if (!email) return;
+
+    const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    await sendEmail(
+      email,
+      `${petName} foi vinculado à sua clínica no PetHelp`,
+      `
+      <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1b2320;">
+        <div style="background: #1f7a63; color: #fff; padding: 20px 24px; border-radius: 16px 16px 0 0;">
+          <h1 style="margin: 0; font-size: 20px;">PetHelp</h1>
+        </div>
+        <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
+          <h2 style="margin: 0 0 12px; font-size: 18px;">Novo pet vinculado</h2>
+          <p style="margin: 0 0 16px; color: #5f6a64;">
+            O responsável de <strong>${escape(petName)}</strong> usou o código de conexão de
+            <strong>${escape(clinicName)}</strong> e vinculou o pet à clínica.
+          </p>
+          <p style="margin: 0 0 16px; color: #5f6a64;">
+            No painel da clínica você já encontra o prontuário, as vacinas, os exames e a agenda desse pet.
+          </p>
+          <p style="margin: 0; font-size: 13px; color: #5f6a64;">
+            O responsável pode encerrar o vínculo quando quiser, e nesse momento o acesso da clínica é cortado.
+          </p>
+        </div>
+      </div>`
+    );
+  } catch (error) {
+    console.error('notifyClinicAboutNewLink error', error);
+  }
+}
+
 petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
   const connection = await pool.getConnection();
 
@@ -705,13 +770,27 @@ petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
 
     const connectionCode = typeof req.body?.connectionCode === 'string' ? req.body.connectionCode.trim().toUpperCase() : '';
     if (!connectionCode) {
-      res.status(400).json({ message: 'connectionCode is required' });
+      res.status(400).json({ message: 'Digite o código de conexão da clínica.' });
       return;
     }
 
     const clinic = await findClinicByConnectionCode(connectionCode);
     if (!clinic) {
-      res.status(404).json({ message: 'Clinic not found' });
+      res.status(404).json({
+        message: `Nenhuma clínica encontrada com o código ${connectionCode}. Confira o código no painel da clínica.`,
+      });
+      return;
+    }
+
+    const clinicName = String(clinic.trade_name);
+
+    if (existing.linked_clinic_id === clinic.id) {
+      res.status(200).json({
+        data: normalizePet(existing),
+        message: `${existing.name} já estava vinculado a ${clinicName}.`,
+        clinicName,
+        alreadyLinked: true,
+      });
       return;
     }
 
@@ -724,13 +803,17 @@ petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
 
     const updated = await loadPetById(connection, String(req.params.id));
     if (!updated) {
-      res.status(500).json({ message: 'Pet link update failed' });
+      res.status(500).json({ message: 'Não foi possível concluir o vínculo. Tente novamente.' });
       return;
     }
 
+    // Avisa a clínica: sem isso ela só descobre o pet novo se procurar na lista.
+    await notifyClinicAboutNewLink(clinic.id, clinic.user_id, updated.id, updated.name, clinicName);
+
     res.json({
       data: normalizePet(updated),
-      message: 'Pet linked to clinic successfully',
+      message: `${updated.name} agora está vinculado a ${clinicName}.`,
+      clinicName,
     });
   } catch (error) {
     await connection.rollback();

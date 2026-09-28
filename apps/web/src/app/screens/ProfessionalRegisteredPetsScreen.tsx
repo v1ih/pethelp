@@ -23,6 +23,8 @@ type RegisteredPet = {
   isActive: boolean;
   registeredAt: string | null;
   stillLinked: boolean;
+  /** 'registered' = cadastrado aqui; 'linked' = o responsável vinculou pelo código. */
+  origin?: 'registered' | 'linked';
   tutor: {
     id: string | null;
     name: string | null;
@@ -95,8 +97,12 @@ export default function ProfessionalRegisteredPetsScreen() {
   return (
     <ProfessionalShell
       active="registered"
-      title={isVet ? 'Pets que você cadastrou' : 'Pets cadastrados pela clínica'}
-      description={`Todos os pets que ${isVet ? 'você registrou' : 'a clínica registrou'}, com os dados do responsável e a situação do compartilhamento.`}
+      title={isVet ? 'Pets que você cadastrou' : 'Pets da clínica'}
+      description={
+        isVet
+          ? 'Todos os pets que você registrou, com os dados do responsável e a situação do compartilhamento.'
+          : 'Pets cadastrados pela clínica e pets que os responsáveis vincularam pelo código, com os dados de contato e a situação do acesso.'
+      }
       actions={
         <>
           <button
@@ -157,15 +163,22 @@ export default function ProfessionalRegisteredPetsScreen() {
           <>
             <p className="text-sm text-muted-foreground">
               {filtered.length} pet{filtered.length === 1 ? '' : 's'}
-              {search.trim() ? ` de ${pets.length}` : ''} cadastrado{filtered.length === 1 ? '' : 's'}{' '}
-              {isVet ? 'por você' : 'pela clínica'}.
+              {search.trim() ? ` de ${pets.length}` : ''}{' '}
+              {isVet
+                ? `cadastrado${filtered.length === 1 ? '' : 's'} por você.`
+                : `na clínica: cadastrado${filtered.length === 1 ? '' : 's'} aqui ou vinculado${
+                    filtered.length === 1 ? '' : 's'
+                  } pelo responsável.`}
             </p>
 
             <div className="space-y-4">
               {filtered.map((pet) => {
                 const registered = formatDate(pet.registeredAt);
                 const passExpires = formatDate(pet.vetPass?.expiresAt ?? null);
-                const sharing = Boolean(pet.vetPass?.active);
+                // Pet vinculado pelo responsável não tem Vet-Pass: o acesso vem do
+                // próprio vínculo, então é ele que diz se a clínica ainda acompanha.
+                const linkedByTutor = pet.origin === 'linked';
+                const sharing = linkedByTutor ? pet.stillLinked : Boolean(pet.vetPass?.active);
 
                 return (
                   <article
@@ -196,13 +209,26 @@ export default function ProfessionalRegisteredPetsScreen() {
                             }`}
                           >
                             {sharing ? <ShieldCheck className="h-3.5 w-3.5" /> : <ShieldOff className="h-3.5 w-3.5" />}
-                            {sharing ? 'Vet-Pass ativo' : 'Compartilhamento encerrado'}
+                            {linkedByTutor
+                              ? sharing
+                                ? 'Vínculo ativo'
+                                : 'Vínculo encerrado'
+                              : sharing
+                                ? 'Vet-Pass ativo'
+                                : 'Compartilhamento encerrado'}
                           </span>
+                          {linkedByTutor ? (
+                            <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                              Vinculado pelo responsável
+                            </span>
+                          ) : null}
                           {!pet.isActive ? (
                             <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">Pet inativo</span>
                           ) : null}
                           {registered ? (
-                            <span className="text-xs text-muted-foreground">Cadastrado em {registered}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {linkedByTutor ? 'No PetHelp desde' : 'Cadastrado em'} {registered}
+                            </span>
                           ) : null}
                         </div>
                       </div>
@@ -254,6 +280,12 @@ export default function ProfessionalRegisteredPetsScreen() {
                       <p className="mt-3 text-xs text-muted-foreground">
                         Vet-Pass <strong className="font-mono text-foreground">{pet.vetPass.code}</strong>
                         {passExpires ? ` · ${sharing ? 'válido até' : 'expirou em'} ${passExpires}` : ''}
+                      </p>
+                    ) : linkedByTutor ? (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {sharing
+                          ? 'O responsável vinculou este pet à clínica com o código de conexão, e pode encerrar o vínculo quando quiser.'
+                          : 'O responsável encerrou o vínculo deste pet com a clínica.'}
                       </p>
                     ) : (
                       <p className="mt-3 text-xs text-muted-foreground">

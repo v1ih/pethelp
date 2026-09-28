@@ -17,6 +17,8 @@ export interface Pet {
   /** Data de nascimento (YYYY-MM-DD). Quando existe, a idade é calculada a partir dela. */
   birthDate?: string | null;
   linkedClinicId?: string | null;
+  /** Nome da clínica vinculada, para mostrar com quem o pet está compartilhado. */
+  linkedClinicName?: string | null;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -369,6 +371,7 @@ export function normalizePetFromApi(pet: any): Pet {
     neutered: typeof pet.neutered === 'boolean' ? pet.neutered : null,
     birthDate: pet.birthDate ?? pet.birth_date ?? null,
     linkedClinicId: pet.linkedClinicId ?? null,
+    linkedClinicName: pet.linkedClinicName ?? pet.linked_clinic_name ?? null,
     isActive: Boolean(pet.isActive ?? pet.is_active ?? false),
     createdAt: pet.createdAt ?? pet.created_at,
     updatedAt: pet.updatedAt ?? pet.updated_at,

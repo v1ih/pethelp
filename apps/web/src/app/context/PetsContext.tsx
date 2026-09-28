@@ -18,7 +18,10 @@ interface PetsContextValue {
   updatePet: (id: string, pet: PetMutationPayload) => Promise<void>;
   deletePet: (id: string) => Promise<void>;
   transferPetOwnership: (petId: string, payload: { targetTutorEmail: string; securityConfirmation: string; petNameConfirmation: string }) => Promise<Pet>;
-  linkPetToClinic: (petId: string, clinicCode: string) => Promise<void>;
+  linkPetToClinic: (
+    petId: string,
+    clinicCode: string
+  ) => Promise<{ clinicName: string | null; alreadyLinked: boolean }>;
   /** Reflete na tela que o pet deixou de estar vinculado a uma clínica. */
   clearPetClinicLink: (petId: string) => void;
   unlinkPetFromClinic: (petId: string) => Promise<void>;
@@ -233,8 +236,9 @@ export function PetsProvider({ children }: { children: ReactNode }) {
   };
 
   const clearPetClinicLink = (petId: string) => {
-    setPets((prev) => prev.map((petItem) => (petItem.id === petId ? { ...petItem, linkedClinicId: null } : petItem)));
-    setCurrentPet((prev) => (prev?.id === petId ? { ...prev, linkedClinicId: null } : prev));
+    const cleared = { linkedClinicId: null, linkedClinicName: null };
+    setPets((prev) => prev.map((petItem) => (petItem.id === petId ? { ...petItem, ...cleared } : petItem)));
+    setCurrentPet((prev) => (prev?.id === petId ? { ...prev, ...cleared } : prev));
   };
 
   const unlinkPetFromClinic = async (petId: string) => {
@@ -250,34 +254,48 @@ export function PetsProvider({ children }: { children: ReactNode }) {
     clearPetClinicLink(petId);
   };
 
+  /** Vincula o pet à clínica pelo código e devolve o nome dela, para a tela confirmar. */
   const linkPetToClinic = async (petId: string, clinicCode: string) => {
-    const resp = await fetch(`${API_BASE}/api/pets/${petId}/link-clinic`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify({ connectionCode: clinicCode }),
-    });
+    const code = clinicCode.trim().toUpperCase();
 
-    if (!resp.ok) {
-      throw new Error((await resp.json()).message ?? 'Link clinic failed');
+    let resp: Response;
+    try {
+      resp = await fetch(`${API_BASE}/api/pets/${petId}/link-clinic`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ connectionCode: code }),
+      });
+    } catch {
+      throw new Error('Não foi possível falar com o servidor. Verifique sua conexão e tente de novo.');
     }
 
-    const { data } = await resp.json();
-    const updatedPet = normalizePetFromApi(data);
+    const payload = await resp.json().catch(() => null);
+
+    if (!resp.ok) {
+      throw new Error(payload?.message ?? 'Não foi possível vincular a clínica. Tente de novo.');
+    }
+
+    const updatedPet = normalizePetFromApi(payload?.data ?? {});
+    const clinicName: string | null = payload?.clinicName ?? updatedPet.linkedClinicName ?? null;
 
     setPets((prev) => prev.map((petItem) => (petItem.id === petId ? { ...petItem, ...updatedPet } : petItem)));
     setCurrentPet((prev) => (prev?.id === petId ? { ...prev, ...updatedPet } : prev));
     addNotification({
       userId: user?.id || '',
       type: 'connection',
-      title: 'Clínica vinculada com sucesso',
-      message: `Seu pet foi vinculado à clínica com o código ${clinicCode}.`,
+      title: 'Clínica vinculada',
+      message: clinicName
+        ? `${updatedPet.name || 'Seu pet'} agora está vinculado a ${clinicName}.`
+        : `Seu pet foi vinculado à clínica com o código ${code}.`,
       date: new Date().toISOString().split('T')[0],
       petId,
       read: false,
     });
+
+    return { clinicName, alreadyLinked: payload?.alreadyLinked === true };
   };
 
   return (

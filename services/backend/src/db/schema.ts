@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS clinics (
   connection_code VARCHAR(32) UNIQUE, services JSONB, working_hours JSONB,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Código de conexão da clínica: é o que o responsável digita para vincular o pet.
+-- Clínica sem código (cadastro antigo) não conseguia receber vínculo nenhum, e código
+-- gravado em minúsculas nunca era encontrado, porque a tela força maiúsculas.
+UPDATE clinics
+SET connection_code = UPPER(SUBSTRING(md5(random()::text || id::text) FROM 1 FOR 12))
+WHERE connection_code IS NULL OR TRIM(connection_code) = '';
+UPDATE clinics c
+SET connection_code = UPPER(TRIM(c.connection_code))
+WHERE c.connection_code IS NOT NULL
+  AND c.connection_code <> UPPER(TRIM(c.connection_code))
+  AND NOT EXISTS (
+    SELECT 1 FROM clinics other
+    WHERE other.id <> c.id AND other.connection_code = UPPER(TRIM(c.connection_code))
+  );
 CREATE TABLE IF NOT EXISTS veterinarians (
   id UUID PRIMARY KEY, user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL, crmv VARCHAR(50) NOT NULL, crmv_uf CHAR(2) NOT NULL, specialty VARCHAR(120), phone VARCHAR(30),

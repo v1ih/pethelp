@@ -215,7 +215,10 @@ export async function deleteUserProfile(userId: string, db?: DbClient) {
 export async function createClinicProfile(userId: string, input: CreateClinicProfileInput, db?: DbClient) {
   const client = getDbClient(db);
   const id = randomUUID();
-  const connectionCode = input.connection_code ?? randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
+  // Sempre em maiúsculas: a tela do responsável força maiúsculas ao digitar, e um
+  // código gravado em minúsculas deixaria o vínculo impossível.
+  const connectionCode =
+    (input.connection_code ?? '').trim().toUpperCase() || randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
 
   await client.execute(
     `INSERT INTO clinics (id, user_id, trade_name, corporate_name, cnpj, phone, address, connection_code, services, working_hours)
@@ -376,9 +379,21 @@ export async function findClinicByUserId(userId: string, db?: DbClient) {
   return rows.length ? rows[0] : null;
 }
 
+/**
+ * Procura a clínica pelo código de conexão ignorando caixa e espaços. No Postgres o
+ * `=` diferencia maiúsculas de minúsculas, então um código gravado como "abc123" nunca
+ * era encontrado quando a pessoa digitava "ABC123" (a tela do responsável força
+ * maiúsculas) — e o vínculo simplesmente não acontecia.
+ */
 export async function findClinicByConnectionCode(connectionCode: string, db?: DbClient) {
   const client = getDbClient(db);
-  const [rows] = await client.query<ClinicRow[]>(`SELECT * FROM clinics WHERE connection_code = ? LIMIT 1`, [connectionCode]);
+  const code = connectionCode.trim();
+  if (!code) return null;
+
+  const [rows] = await client.query<ClinicRow[]>(
+    `SELECT * FROM clinics WHERE UPPER(TRIM(connection_code)) = UPPER(?) LIMIT 1`,
+    [code]
+  );
   return rows.length ? rows[0] : null;
 }
 

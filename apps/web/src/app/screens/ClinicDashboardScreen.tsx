@@ -182,7 +182,10 @@ export default function ClinicDashboardScreen() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">Código da clínica</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Compartilhe com veterinários para solicitar vínculo direto com a sua clínica.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Passe este código para o responsável vincular o pet à clínica, e para veterinários solicitarem
+                      vínculo com a sua clínica.
+                    </p>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                       <div className="min-w-0 break-all rounded-[22px] border border-dashed border-border bg-card px-3 py-3 text-center font-mono text-base tracking-[0.16em] text-foreground sm:px-4 sm:py-4 sm:text-lg sm:tracking-[0.28em]">
                         {connectionCode || 'Sem código disponível'}

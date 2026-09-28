@@ -271,14 +271,19 @@ router.get('/', async (req: AuthRequest, res, next) => {
     }
 
     const search = asTrimmedString(req.query.q).toLowerCase();
-    const ownerColumn =
-      professional.kind === 'clinic' ? 'p.registered_by_clinic_id' : 'p.registered_by_veterinarian_id';
+    // A clínica vê tanto os pets que ela cadastrou quanto os que o responsável vinculou
+    // pelo código de conexão — sem isso o pet vinculado não aparecia em tela nenhuma.
+    const ownerFilter =
+      professional.kind === 'clinic'
+        ? '(p.registered_by_clinic_id = ? OR p.linked_clinic_id = ?)'
+        : 'p.registered_by_veterinarian_id = ?';
+    const ownerValues = professional.kind === 'clinic' ? [professional.id, professional.id] : [professional.id];
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `
         SELECT
           p.id, p.name, p.species, p.breed, p.age, p.weight, p.sex, p.neutered, p.photo, p.birth_date,
-          p.allergies, p.conditions, p.is_active, p.created_at, p.linked_clinic_id,
+          p.allergies, p.conditions, p.is_active, p.created_at, p.linked_clinic_id, p.registered_by_clinic_id,
           t.id AS tutor_id, t.name AS tutor_name, t.phone AS tutor_phone,
           u.email AS tutor_email, u.email_verified AS tutor_email_verified,
           vp.pass_code, vp.expires_at AS pass_expires_at
@@ -292,7 +297,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
           ORDER BY created_at DESC
           LIMIT 1
         ) vp ON TRUE
-        WHERE ${ownerColumn} = ?
+        WHERE ${ownerFilter}
           AND (
             ? = ''
             OR LOWER(p.name) LIKE ?
@@ -302,7 +307,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
         ORDER BY p.created_at DESC
         LIMIT 200
       `,
-      [professional.userId, professional.id, search, `%${search}%`, `%${search}%`, `%${search}%`]
+      [professional.userId, ...ownerValues, search, `%${search}%`, `%${search}%`, `%${search}%`]
     );
 
     res.json({
@@ -325,6 +330,11 @@ router.get('/', async (req: AuthRequest, res, next) => {
           registeredAt: formatDay(row.created_at),
           // Só a clínica tem vínculo direto com o pet; o veterinário acompanha pelo Vet-Pass.
           stillLinked: professional.kind === 'clinic' ? row.linked_clinic_id === professional.id : null,
+          // De onde veio o pet: cadastro feito aqui ou vínculo criado pelo responsável.
+          origin:
+            professional.kind === 'clinic' && row.registered_by_clinic_id !== professional.id
+              ? 'linked'
+              : 'registered',
           tutor: {
             id: row.tutor_id ? String(row.tutor_id) : null,
             name: row.tutor_name ?? null,
