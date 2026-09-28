@@ -59,12 +59,12 @@ export function TutorShell({ active, title, description, actions, children }: Tu
 
   const navItems: NavItem[] = [
     { key: 'home', label: 'Início', icon: Home, path: dashboardPath, visibleFor: ['owner', 'veterinarian', 'clinic'] },
-    { key: 'profile', label: 'Perfil do pet', icon: PawPrint, path: '/pet-profile', visibleFor: ['owner', 'veterinarian'] },
+    { key: 'profile', label: 'Perfil do pet', icon: PawPrint, path: '/pet-profile', visibleFor: ['owner', 'veterinarian', 'clinic'] },
     { key: 'transfer', label: 'Transferir pet', icon: ArrowLeftRight, path: '/pet-transfer', visibleFor: ['owner'] },
     { key: 'connection', label: 'Conexão clínica', icon: Link2, path: '/connection', visibleFor: ['owner', 'veterinarian'] },
-    { key: 'records', label: 'Prontuário', icon: ClipboardList, path: '/medical-history', visibleFor: ['owner', 'veterinarian'] },
-    { key: 'vaccines', label: 'Vacinas', icon: Syringe, path: '/vaccines', visibleFor: ['owner', 'veterinarian'] },
-    { key: 'exams', label: 'Exames', icon: FileText, path: '/exams', visibleFor: ['owner', 'veterinarian'] },
+    { key: 'records', label: 'Prontuário', icon: ClipboardList, path: '/medical-history', visibleFor: ['owner', 'veterinarian', 'clinic'] },
+    { key: 'vaccines', label: 'Vacinas', icon: Syringe, path: '/vaccines', visibleFor: ['owner', 'veterinarian', 'clinic'] },
+    { key: 'exams', label: 'Exames', icon: FileText, path: '/exams', visibleFor: ['owner', 'veterinarian', 'clinic'] },
     { key: 'shares', label: 'Compartilhamentos', icon: ShieldCheck, path: '/shares', visibleFor: ['owner'] },
     { key: 'appointments', label: 'Agenda', icon: Calendar, path: '/appointments', visibleFor: ['owner', 'veterinarian'] },
     { key: 'payments', label: 'Pagamentos', icon: CircleDollarSign, path: '/payments', visibleFor: ['owner'] },

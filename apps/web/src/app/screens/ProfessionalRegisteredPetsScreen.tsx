@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { History, Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff, X } from 'lucide-react';
+import { History, Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff, Stethoscope, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfessionalShell } from '../components/layout/ProfessionalShell';
 import PetAuditTrail from '../components/audit/PetAuditTrail';
 import { useSession } from '../context/SessionContext';
+import { usePets } from '../context/PetsContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { petAgeLabel } from '../utils/age';
 
@@ -55,6 +56,8 @@ function DataItem({ label, value }: { label: string; value: string }) {
 
 export default function ProfessionalRegisteredPetsScreen() {
   const navigate = useNavigate();
+  // Pets que o profissional acessa, no formato das telas de ficha (prontuário, vacinas).
+  const { pets: accessiblePets, setCurrentPet } = usePets();
   const API_BASE = getApiBase();
   const { user } = useSession();
   const isVet = user?.userType === 'veterinarian';
@@ -92,6 +95,22 @@ export default function ProfessionalRegisteredPetsScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Abre a ficha do pet (prontuário, vacinas e exames). É por aqui que a clínica ou o
+   * veterinário lança o atendimento: escolhe o pet e cai na ficha dele.
+   */
+  const openPetRecord = (petId: string, petName: string) => {
+    // A ficha usa o pet do PetsContext, que é o mesmo objeto das telas do responsável.
+    const found = accessiblePets.find((item) => item.id === petId);
+    if (!found) {
+      toast.error(`Não foi possível abrir a ficha de ${petName}. Atualize a lista e tente de novo.`);
+      return;
+    }
+
+    setCurrentPet(found);
+    navigate('/pet-profile');
+  };
 
   /** Cria a conta do responsável que foi cadastrado sem e-mail e envia o código. */
   const handleInvite = async (event: React.FormEvent) => {
@@ -351,14 +370,24 @@ export default function ProfessionalRegisteredPetsScreen() {
                       )}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setAuditPet({ id: pet.id, name: pet.name })}
-                      className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-[16px] border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                    >
-                      <History className="h-4 w-4" />
-                      Histórico de alterações
-                    </button>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openPetRecord(pet.id, pet.name)}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-[16px] bg-primary px-4 py-2 text-sm text-white transition-colors hover:bg-primary/90"
+                      >
+                        <Stethoscope className="h-4 w-4" />
+                        Abrir ficha do pet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuditPet({ id: pet.id, name: pet.name })}
+                        className="inline-flex min-h-11 items-center gap-2 rounded-[16px] border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                      >
+                        <History className="h-4 w-4" />
+                        Histórico de alterações
+                      </button>
+                    </div>
 
                     {pet.vetPass ? (
                       <p className="mt-3 text-xs text-muted-foreground">

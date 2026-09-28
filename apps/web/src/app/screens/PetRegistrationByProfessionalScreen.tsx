@@ -298,12 +298,12 @@ export default function PetRegistrationByProfessionalScreen() {
     <ProfessionalShell
       active="registration"
       title="Cadastrar pet e responsável"
-      description={`${isVet ? 'Você preenche' : 'A clínica preenche'} os dados no atendimento e o PetHelp entrega tudo ao responsável: e-mail com o resumo, notificação no app e, se ele ainda não tiver conta, um acesso já criado.`}
+      description={`${isVet ? 'Você preenche' : 'A clínica preenche'} os dados no atendimento. Com o e-mail do responsável, o PetHelp manda o resumo e cria o acesso dele; sem e-mail, o cadastro fica aqui no sistema e o acesso pode ser enviado depois.`}
     >
       <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-4">
         <p className="rounded-[18px] border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-          Obrigatórios: <span className="text-foreground">nome e e-mail do responsável</span> e{' '}
-          <span className="text-foreground">nome e espécie do pet</span>. O responsável pode completar o resto depois.
+          Obrigatórios: <span className="text-foreground">nome do responsável</span> e{' '}
+          <span className="text-foreground">nome e espécie do pet</span>. O resto pode ser completado depois.
         </p>
 
         <section className="rounded-[28px] border border-border/70 bg-card p-5 shadow-[0_24px_60px_-36px_rgba(127,162,106,0.18)] sm:p-6">

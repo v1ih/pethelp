@@ -70,6 +70,13 @@ export default function MedicalHistoryScreen() {
    */
   const lockedForTutor = (addedBy?: string) => isTutor && (addedBy ?? 'veterinarian') !== 'tutor';
 
+  /** Data do banco ('YYYY-MM-DD') no formato que a pessoa lê. */
+  const formatDay = (value?: string | null) => {
+    if (!value) return '—';
+    const date = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
+  };
+
   const [auditOpen, setAuditOpen] = useState(false);
   const [vetTab, setVetTab] = useState<'consults' | 'reviews'>('consults');
   const [showForm, setShowForm] = useState(false);
@@ -432,7 +439,7 @@ export default function MedicalHistoryScreen() {
                   <div className="mb-4 flex items-start justify-between gap-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                       <Calendar className="h-4 w-4" />
-                      <span className="font-medium text-foreground">{record.date}</span>
+                      <span className="font-medium text-foreground">{formatDay(record.date)}</span>
                       {record.clinicName && <span>{record.clinicName}</span>}
                     </div>
                     <div className="flex items-center gap-2">

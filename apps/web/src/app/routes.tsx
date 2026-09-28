@@ -204,7 +204,7 @@ export const router = createBrowserRouter([
 
   {
     path: '/pet-profile',
-    Component: withAllowedUserTypes(PetProfileScreen, ['owner', 'veterinarian']),
+    Component: withAllowedUserTypes(PetProfileScreen, ['owner', 'veterinarian', 'clinic']),
   },
   {
     path: '/pet-transfer',
@@ -212,7 +212,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/medical-history',
-    Component: withAllowedUserTypes(MedicalHistoryScreen, ['owner', 'veterinarian']),
+    Component: withAllowedUserTypes(MedicalHistoryScreen, ['owner', 'veterinarian', 'clinic']),
   },
   {
     path: '/veterinarian-history',
@@ -220,11 +220,11 @@ export const router = createBrowserRouter([
   },
   {
     path: '/vaccines',
-    Component: withAllowedUserTypes(VaccinationScreen, ['owner', 'veterinarian']),
+    Component: withAllowedUserTypes(VaccinationScreen, ['owner', 'veterinarian', 'clinic']),
   },
   {
     path: '/exams',
-    Component: withAllowedUserTypes(ExamsScreen, ['owner', 'veterinarian']),
+    Component: withAllowedUserTypes(ExamsScreen, ['owner', 'veterinarian', 'clinic']),
   },
   {
     path: '/shares',
