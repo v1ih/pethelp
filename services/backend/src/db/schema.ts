@@ -177,6 +177,30 @@ CREATE TABLE IF NOT EXISTS pet_guardians (
   CONSTRAINT uq_pet_guardian UNIQUE (pet_id, tutor_id)
 );
 
+-- Cobranças lançadas por clínicas e veterinários (o que foi feito, quanto, se foi pago).
+CREATE TABLE IF NOT EXISTS payments (
+  id UUID PRIMARY KEY,
+  pet_id UUID REFERENCES pets(id) ON DELETE SET NULL,
+  tutor_id UUID REFERENCES tutors(id) ON DELETE SET NULL,
+  appointment_id UUID REFERENCES appointments(id) ON DELETE SET NULL,
+  clinic_id UUID REFERENCES clinics(id) ON DELETE CASCADE,
+  veterinarian_id UUID REFERENCES veterinarians(id) ON DELETE CASCADE,
+  description VARCHAR(200) NOT NULL,
+  amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','cancelled')),
+  method VARCHAR(20) CHECK (method IN ('pix','dinheiro','credito','debito','transferencia','outro')),
+  due_date DATE,
+  paid_at TIMESTAMP,
+  notes TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Toda cobrança pertence a uma clínica OU a um veterinário autônomo.
+  CONSTRAINT chk_payment_owner CHECK (clinic_id IS NOT NULL OR veterinarian_id IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_payments_clinic ON payments (clinic_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_veterinarian ON payments (veterinarian_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_tutor ON payments (tutor_id, created_at DESC);
+
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END; $$ LANGUAGE plpgsql;
 
@@ -193,4 +217,5 @@ DROP TRIGGER IF EXISTS vaccines_updated_at ON vaccines; CREATE TRIGGER vaccines_
 DROP TRIGGER IF EXISTS referrals_updated_at ON referrals; CREATE TRIGGER referrals_updated_at BEFORE UPDATE ON referrals FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS notifications_updated_at ON notifications; CREATE TRIGGER notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS vet_passes_updated_at ON vet_passes; CREATE TRIGGER vet_passes_updated_at BEFORE UPDATE ON vet_passes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS payments_updated_at ON payments; CREATE TRIGGER payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 `;

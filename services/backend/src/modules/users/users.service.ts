@@ -358,6 +358,12 @@ export async function findUserById(id: string) {
   return rows.length ? rows[0] : null;
 }
 
+export async function findTutorById(tutorId: string, db?: DbClient) {
+  const client = getDbClient(db);
+  const [rows] = await client.query<TutorRow[]>(`SELECT * FROM tutors WHERE id = ? LIMIT 1`, [tutorId]);
+  return rows.length ? rows[0] : null;
+}
+
 export async function findTutorByUserId(userId: string, db?: DbClient) {
   const client = getDbClient(db);
   const [rows] = await client.query<TutorRow[]>(`SELECT * FROM tutors WHERE user_id = ? LIMIT 1`, [userId]);

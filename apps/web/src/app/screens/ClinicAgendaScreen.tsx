@@ -8,6 +8,7 @@ import { useInteraction } from '../context/InteractionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { useDashboardBackLogout } from '../navigation';
 import MonthCalendar from '../components/calendar/MonthCalendar';
+import AppointmentActions from '../components/appointments/AppointmentActions';
 
 const STATUS_LABEL: Record<string, string> = { scheduled: 'Agendada', completed: 'Concluída', cancelled: 'Cancelada' };
 function formatDayLabelPt(dateStr: string) {
@@ -215,6 +216,12 @@ export default function ClinicAgendaScreen() {
                       </div>
                       <p className="text-sm text-muted-foreground">{a.time?.slice(0, 5)} • {a.veterinarianName || 'Veterinário'}</p>
                       <p className="text-sm text-muted-foreground">{a.reason}</p>
+                      <AppointmentActions
+                        appointmentId={a.id}
+                        petName={a.petName}
+                        status={a.status}
+                        contactLabel="Falar com o responsável"
+                      />
                     </div>
                   ))
                 )}

@@ -13,6 +13,7 @@ import vetPassesRouter from '../modules/vet-passes/vet-passes.routes.js';
 import remindersRouter from '../modules/internal/reminders.routes.js';
 import petRegistrationsRouter from '../modules/pet-registrations/pet-registrations.routes.js';
 import supportRouter from '../modules/support/support.routes.js';
+import paymentsRouter from '../modules/payments/payments.routes.js';
 
 export const apiRouter = Router();
 
@@ -28,5 +29,6 @@ apiRouter.use('/pet-registrations', petRegistrationsRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/reviews', reviewsRouter);
 apiRouter.use('/vet-passes', vetPassesRouter);
+apiRouter.use('/payments', paymentsRouter);
 apiRouter.use('/support', supportRouter);
 apiRouter.use('/internal', remindersRouter);

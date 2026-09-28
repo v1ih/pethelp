@@ -7,11 +7,40 @@ import { requireAuth } from '../../middlewares/auth.js';
 import {
   findClinicByConnectionCode,
   findClinicByUserId,
+  findTutorById,
   findTutorByUserId,
   findUserByEmail,
   findVeterinarianByUserId,
 } from '../users/users.service.js';
+import { sendEmail } from '../mail/mailer.js';
 import { canAccessPetHealthData, isTutorGuardianOfPet } from './pet-access.js';
+
+/** Avisa quem foi adicionado como responsável adicional (guarda compartilhada). */
+function sharedGuardianEmailTemplate(options: { guardianName: string; ownerName: string; petName: string }) {
+  const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  return `
+  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1b2320;">
+    <div style="background: #1f7a63; color: #fff; padding: 20px 24px; border-radius: 16px 16px 0 0;">
+      <h1 style="margin: 0; font-size: 20px;">🐾 PetHelp</h1>
+    </div>
+    <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
+      <h2 style="margin: 0 0 12px; font-size: 18px;">Você agora cuida de ${escape(options.petName)}</h2>
+      <p style="margin: 0 0 16px; color: #5f6a64;">
+        Olá, ${escape(options.guardianName)}! <strong>${escape(options.ownerName)}</strong> adicionou você como
+        responsável de <strong>${escape(options.petName)}</strong> no PetHelp.
+      </p>
+      <p style="margin: 0 0 16px; color: #5f6a64;">
+        Na sua conta você já encontra o pet com o mesmo acesso do responsável principal: prontuário, vacinas,
+        exames, agenda de consultas e compartilhamentos.
+      </p>
+      <p style="margin: 0; font-size: 13px; color: #5f6a64;">
+        Não esperava por isso? Fale com ${escape(options.ownerName)} — só o responsável principal pode adicionar ou
+        remover quem cuida do pet.
+      </p>
+    </div>
+  </div>`;
+}
 
 type PetRow = RowDataPacket & {
   id: string;
@@ -146,8 +175,20 @@ function canTutorAccessPet(user: AuthRequest['user'], row: PetRow) {
   return user?.userType === 'tutor' ? row.current_tutor_id === user.id : true;
 }
 
+/**
+ * Ações de dono: transferir, excluir e gerenciar quem cuida do pet. Ficam só com o
+ * responsável principal — um responsável adicional não pode dar o pet a outra pessoa
+ * nem remover quem o incluiu.
+ */
 function canManagePet(tutorId: string | null, row: PetRow) {
   return !!tutorId && row.current_tutor_id === tutorId;
+}
+
+/** Uso do dia a dia (editar dados, vincular clínica): vale também para a guarda compartilhada. */
+async function canEditPet(tutorId: string | null, row: PetRow) {
+  if (!tutorId) return false;
+  if (row.current_tutor_id === tutorId) return true;
+  return isTutorGuardianOfPet(row.id, tutorId);
 }
 
 async function resolveCurrentTutorId(user: AuthRequest['user']) {
@@ -420,7 +461,7 @@ petsRouter.patch('/:id', async (req: AuthRequest, res, next) => {
     }
 
     const tutorId = await resolveCurrentTutorId(req.user);
-    if (!canManagePet(tutorId, existing)) {
+    if (!(await canEditPet(tutorId, existing))) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -657,7 +698,7 @@ petsRouter.post('/:id/link-clinic', async (req: AuthRequest, res, next) => {
     }
 
     const tutorId = await resolveCurrentTutorId(req.user);
-    if (!canManagePet(tutorId, existing)) {
+    if (!(await canEditPet(tutorId, existing))) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -714,7 +755,7 @@ petsRouter.delete('/:id/link-clinic', async (req: AuthRequest, res, next) => {
     }
 
     const tutorId = await resolveCurrentTutorId(req.user);
-    if (!canManagePet(tutorId, existing)) {
+    if (!(await canEditPet(tutorId, existing))) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
@@ -851,10 +892,43 @@ petsRouter.post('/:id/guardians', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    await pool.execute(
+    const [inserted] = await pool.execute<ResultSetHeader>(
       'INSERT INTO pet_guardians (id, pet_id, tutor_id) VALUES (?, ?, ?) ON CONFLICT (pet_id, tutor_id) DO NOTHING',
       [randomUUID(), pet.id, targetTutor.id]
     );
+
+    // Só avisa quando o vínculo é novo, para não disparar e-mail em cliques repetidos.
+    if ((inserted.affectedRows ?? 0) > 0) {
+      const ownerTutor = pet.current_tutor_id ? await findTutorById(pet.current_tutor_id) : null;
+      const ownerName = ownerTutor?.name ?? 'O responsável principal';
+
+      await pool.execute(
+        `INSERT INTO notifications (id, user_id, pet_id, source_key, type, title, message, notification_date)
+         VALUES (?, ?, ?, ?, 'connection', ?, ?, CURRENT_DATE)`,
+        [
+          randomUUID(),
+          targetUser.id,
+          pet.id,
+          `pet-guardian:${pet.id}:${targetTutor.id}`,
+          'Você agora cuida de um pet',
+          `${ownerName} adicionou você como responsável de ${pet.name}. O pet já aparece na sua conta.`,
+        ]
+      );
+
+      try {
+        await sendEmail(
+          targetUser.email,
+          `Você agora também cuida de ${pet.name} no PetHelp`,
+          sharedGuardianEmailTemplate({
+            guardianName: targetTutor.name,
+            ownerName,
+            petName: pet.name,
+          })
+        );
+      } catch (mailError) {
+        console.error('Falha ao avisar o responsável adicionado:', mailError);
+      }
+    }
 
     res.status(201).json({ data: await loadPetGuardians(pet.id) });
   } catch (error) {

@@ -5,6 +5,7 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { findTutorByUserId, findUserById } from '../users/users.service.js';
+import { isTutorGuardianOfPet } from '../pets/pet-access.js';
 import { codeEmailTemplate, sendEmail } from '../mail/mailer.js';
 
 type VetPassRow = RowDataPacket & {
@@ -87,6 +88,13 @@ function normalizeVetPass(row: VetPassRow) {
   };
 }
 
+/** O responsável pode ser o principal do pet ou alguém com guarda compartilhada. */
+async function tutorCanActOnPet(tutorId: string | null, petId: string, ownerTutorId: string | null) {
+  if (!tutorId) return false;
+  if (ownerTutorId === tutorId) return true;
+  return isTutorGuardianOfPet(petId, tutorId);
+}
+
 async function resolveCurrentTutorId(user: AuthRequest['user']) {
   if (user?.userType !== 'tutor') return null;
   const tutor = await findTutorByUserId(user.id);
@@ -152,9 +160,10 @@ router.get('/me', async (req: AuthRequest, res, next) => {
         LEFT JOIN veterinarians v ON v.user_id = vp.redeemed_by_user_id
         LEFT JOIN clinics c ON c.user_id = vp.redeemed_by_user_id
         WHERE vp.tutor_id = ?
+           OR vp.pet_id IN (SELECT pet_id FROM pet_guardians WHERE tutor_id = ?)
         ORDER BY vp.created_at DESC
       `,
-      [tutorId]
+      [tutorId, tutorId]
     );
 
     res.json({ data: rows.map(normalizeVetPass) });
@@ -186,10 +195,14 @@ router.post('/', async (req: AuthRequest, res, next) => {
     const includesExams = body.includesExams === undefined ? true : Boolean(body.includesExams);
 
     const pet = await loadPetById(connection, petId);
-    if (!pet || pet.current_tutor_id !== tutorId) {
+    if (!pet || !(await tutorCanActOnPet(tutorId, pet.id, pet.current_tutor_id))) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }
+
+    // O passe fica sempre no nome do responsável principal, para que ele e quem tem
+    // guarda compartilhada enxerguem o mesmo compartilhamento na lista.
+    const passTutorId = pet.current_tutor_id ?? tutorId;
 
     // Anexos são opcionais: dá para gerar um Vet-Pass mesmo sem exames anexados.
     if (!petId || !petName) {
@@ -220,7 +233,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
           includes_exams
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [id, passCode, tutorId, petId, petName, JSON.stringify(documents), null, expiresAt, null, includesMedicalRecords, includesVaccines, includesExams]
+      [id, passCode, passTutorId, petId, petName, JSON.stringify(documents), null, expiresAt, null, includesMedicalRecords, includesVaccines, includesExams]
     );
     await connection.commit();
 
@@ -303,7 +316,7 @@ router.post('/:code/email', async (req: AuthRequest, res, next) => {
 
     const code = String(req.params.code).trim().toUpperCase();
     const pass = await loadVetPassByCode(pool, code);
-    if (!pass || pass.tutor_id !== tutorId) {
+    if (!pass || !(await tutorCanActOnPet(tutorId, pass.pet_id, pass.tutor_id))) {
       res.status(404).json({ message: 'Vet-Pass not found' });
       return;
     }
@@ -350,7 +363,7 @@ router.get('/:code', async (req: AuthRequest, res, next) => {
 
     if (req.user?.userType === 'tutor') {
       const tutorId = await resolveCurrentTutorId(req.user);
-      if (!tutorId || pass.tutor_id !== tutorId) {
+      if (!tutorId || !(await tutorCanActOnPet(tutorId, pass.pet_id, pass.tutor_id))) {
         res.status(403).json({ message: 'Forbidden' });
         return;
       }
@@ -377,7 +390,7 @@ router.delete('/:code', async (req: AuthRequest, res, next) => {
     }
 
     const tutorId = await resolveCurrentTutorId(req.user);
-    if (!tutorId || pass.tutor_id !== tutorId) {
+    if (!tutorId || !(await tutorCanActOnPet(tutorId, pass.pet_id, pass.tutor_id))) {
       res.status(403).json({ message: 'Forbidden' });
       return;
     }

@@ -1,5 +1,5 @@
 ﻿import * as React from 'react';
-import { ArrowLeftRight, Bell, ClipboardList, FileText, HelpCircle, Home, Link2, LogOut, PawPrint, Settings, ShieldCheck, Syringe, Calendar } from 'lucide-react';
+import { ArrowLeftRight, Bell, CircleDollarSign, ClipboardList, FileText, HelpCircle, Home, Link2, LogOut, PawPrint, Settings, ShieldCheck, Syringe, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { ThemeToggle } from './ThemeToggle';
 import EmailVerificationBanner from './EmailVerificationBanner';
@@ -10,7 +10,7 @@ import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 import { getDashboardRouteForUserType, getSettingsRouteForUserType, type UserType } from '../../context/shared';
 
-export type TutorNavKey = 'home' | 'profile' | 'transfer' | 'connection' | 'records' | 'vaccines' | 'exams' | 'shares' | 'appointments' | 'settings';
+export type TutorNavKey = 'payments' | 'home' | 'profile' | 'transfer' | 'connection' | 'records' | 'vaccines' | 'exams' | 'shares' | 'appointments' | 'settings';
 
 type TutorShellProps = React.PropsWithChildren<{
   active: TutorNavKey;
@@ -67,6 +67,7 @@ export function TutorShell({ active, title, description, actions, children }: Tu
     { key: 'exams', label: 'Exames', icon: FileText, path: '/exams', visibleFor: ['owner', 'veterinarian'] },
     { key: 'shares', label: 'Compartilhamentos', icon: ShieldCheck, path: '/shares', visibleFor: ['owner'] },
     { key: 'appointments', label: 'Agenda', icon: Calendar, path: '/appointments', visibleFor: ['owner', 'veterinarian'] },
+    { key: 'payments', label: 'Pagamentos', icon: CircleDollarSign, path: '/payments', visibleFor: ['owner'] },
     { key: 'settings', label: 'Config.', icon: Settings, path: settingsPath, visibleFor: ['owner', 'clinic', 'veterinarian'] },
   ].filter((item) => !item.visibleFor || item.visibleFor.includes(currentUserType));
 

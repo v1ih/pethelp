@@ -7,6 +7,7 @@ import { getApiBase, getAuthHeaders } from '../context/shared';
 import { useAppNavigation, useDashboardBackLogout } from '../navigation';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
 import MonthCalendar from '../components/calendar/MonthCalendar';
+import AppointmentActions from '../components/appointments/AppointmentActions';
 
 const VET_STATUS_LABEL: Record<string, string> = { scheduled: 'Agendada', completed: 'Concluída', cancelled: 'Cancelada' };
 function vetFormatDayLabel(dateStr: string) {
@@ -356,6 +357,12 @@ export default function VeterinarianScheduleScreen() {
                       </div>
                       <p className="text-sm text-muted-foreground">{a.time?.slice(0, 5)} • {a.clinicName || 'Atendimento'}</p>
                       <p className="text-sm text-muted-foreground">{a.reason}</p>
+                      <AppointmentActions
+                        appointmentId={a.id}
+                        petName={a.petName}
+                        status={a.status}
+                        contactLabel="Falar com o responsável"
+                      />
                     </div>
                   ))
                 )}

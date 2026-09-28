@@ -6,7 +6,16 @@ import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { findClinicByUserId, findTutorByUserId, findVeterinarianByUserId } from '../users/users.service.js';
 import { isTutorGuardianOfPet } from '../pets/pet-access.js';
+import { sendEmail } from '../mail/mailer.js';
 import { asTrimmedString, formatDate, getWeekdayKey, isWithinRange, timeToMinutes } from './appointments.utils.js';
+
+type AppointmentContact = {
+  kind: 'tutor' | 'veterinarian' | 'clinic';
+  userId: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
 
 type AppointmentRow = RowDataPacket & {
   id: string;
@@ -348,13 +357,44 @@ async function canAccessPet(user: AuthRequest['user'], petId: string) {
   return { allowed: true, pet };
 }
 
+/**
+ * Autoriza mexer numa consulta específica. Diferente de canAccessPet: aqui não basta
+ * ser veterinário — tem que ser a consulta dele, da clínica dele, ou do responsável
+ * (principal ou em guarda compartilhada) do pet.
+ */
+async function canManageAppointment(user: AuthRequest['user'], appointment: AppointmentRow) {
+  if (user?.userType === 'tutor') {
+    const tutorId = await resolveCurrentTutorId(user);
+    if (!tutorId) return false;
+    if (appointment.tutor_id === tutorId) return true;
+    return isTutorGuardianOfPet(appointment.pet_id, tutorId);
+  }
+
+  if (user?.userType === 'veterinarian') {
+    const veterinarianId = await resolveCurrentVeterinarianId(user);
+    return Boolean(veterinarianId) && appointment.veterinarian_id === veterinarianId;
+  }
+
+  if (user?.userType === 'clinic') {
+    const clinicId = await resolveCurrentClinicId(user);
+    return Boolean(clinicId) && appointment.clinic_id === clinicId;
+  }
+
+  return false;
+}
+
 async function listAppointmentsForUser(user: AuthRequest['user']) {
   if (user?.userType === 'tutor') {
     const tutorId = await resolveCurrentTutorId(user);
     if (!tutorId) return [];
+    // Inclui a agenda dos pets em guarda compartilhada: quem cuida junto precisa
+    // enxergar as consultas, não só os dados de saúde.
     const [rows] = await pool.query<AppointmentRow[]>(
-      'SELECT * FROM appointments WHERE tutor_id = ? ORDER BY appointment_date DESC, appointment_time DESC',
-      [tutorId]
+      `SELECT * FROM appointments
+       WHERE tutor_id = ?
+          OR pet_id IN (SELECT pet_id FROM pet_guardians WHERE tutor_id = ?)
+       ORDER BY appointment_date DESC, appointment_time DESC`,
+      [tutorId, tutorId]
     );
     return rows;
   }
@@ -380,6 +420,112 @@ async function listAppointmentsForUser(user: AuthRequest['user']) {
   }
 
   return [];
+}
+
+/** Dados de contato do responsável e do profissional envolvidos na consulta. */
+async function loadAppointmentContacts(appointment: AppointmentRow) {
+  const [tutorRows] = await pool.query<RowDataPacket[]>(
+    `SELECT t.name, t.phone, t.user_id, u.email
+     FROM tutors t JOIN users u ON u.id = t.user_id
+     WHERE t.id = ? LIMIT 1`,
+    [appointment.tutor_id]
+  );
+  const tutorRow = tutorRows[0];
+
+  const tutor: AppointmentContact | null = tutorRow
+    ? {
+        kind: 'tutor',
+        userId: String(tutorRow.user_id),
+        name: String(tutorRow.name),
+        email: (tutorRow.email as string) ?? null,
+        phone: (tutorRow.phone as string) ?? null,
+      }
+    : null;
+
+  let professional: AppointmentContact | null = null;
+
+  if (appointment.veterinarian_id) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT v.name, v.phone, v.user_id, u.email
+       FROM veterinarians v JOIN users u ON u.id = v.user_id
+       WHERE v.id = ? LIMIT 1`,
+      [appointment.veterinarian_id]
+    );
+    const row = rows[0];
+    if (row) {
+      professional = {
+        kind: 'veterinarian',
+        userId: String(row.user_id),
+        name: String(row.name),
+        email: (row.email as string) ?? appointment.veterinarian_email ?? null,
+        phone: (row.phone as string) ?? appointment.veterinarian_phone ?? null,
+      };
+    }
+  }
+
+  if (!professional && appointment.clinic_id) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT c.trade_name, c.phone, c.user_id, u.email
+       FROM clinics c JOIN users u ON u.id = c.user_id
+       WHERE c.id = ? LIMIT 1`,
+      [appointment.clinic_id]
+    );
+    const row = rows[0];
+    if (row) {
+      professional = {
+        kind: 'clinic',
+        userId: String(row.user_id),
+        name: String(row.trade_name),
+        email: (row.email as string) ?? null,
+        phone: (row.phone as string) ?? null,
+      };
+    }
+  }
+
+  // Consulta avulsa preenchida na mão: usa o que foi digitado no agendamento.
+  if (!professional && (appointment.veterinarian_name || appointment.clinic_name)) {
+    professional = {
+      kind: appointment.veterinarian_name ? 'veterinarian' : 'clinic',
+      userId: null,
+      name: appointment.veterinarian_name ?? appointment.clinic_name ?? 'Profissional',
+      email: appointment.veterinarian_email ?? null,
+      phone: appointment.veterinarian_phone ?? null,
+    };
+  }
+
+  return { tutor, professional };
+}
+
+function appointmentEmailTemplate(options: {
+  title: string;
+  intro: string;
+  lines: Array<[string, string]>;
+  note?: string;
+}) {
+  const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const rows = options.lines
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding: 5px 10px; color: #5f6a64; font-size: 14px;">${escape(
+          label
+        )}</td><td style="padding: 5px 10px; font-size: 14px; text-align: right;"><strong>${escape(
+          value
+        )}</strong></td></tr>`
+    )
+    .join('');
+
+  return `
+  <div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1b2320;">
+    <div style="background: #7fa26a; color: #fff; padding: 20px 24px; border-radius: 16px 16px 0 0;">
+      <h1 style="margin: 0; font-size: 20px;">🐾 PetHelp</h1>
+    </div>
+    <div style="border: 1px solid #e5e1d6; border-top: none; border-radius: 0 0 16px 16px; padding: 24px;">
+      <h2 style="margin: 0 0 12px; font-size: 18px;">${escape(options.title)}</h2>
+      <p style="margin: 0 0 16px; color: #5f6a64;">${escape(options.intro)}</p>
+      <table style="width: 100%; border-collapse: collapse; background: #f6f8f6; border-radius: 12px;">${rows}</table>
+      ${options.note ? `<p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">${escape(options.note)}</p>` : ''}
+    </div>
+  </div>`;
 }
 
 router.use(requireAuth);
@@ -644,9 +790,8 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const access = await canAccessPet(req.user, existing.pet_id);
-    if (!access.allowed) {
-      res.status(access.status ?? 403).json({ message: access.message });
+    if (!(await canManageAppointment(req.user, existing))) {
+      res.status(403).json({ message: 'Esta consulta não é sua.' });
       return;
     }
 
@@ -753,14 +898,138 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
-    const access = await canAccessPet(req.user, existing.pet_id);
-    if (!access.allowed) {
-      res.status(access.status ?? 403).json({ message: access.message });
+    if (!(await canManageAppointment(req.user, existing))) {
+      res.status(403).json({ message: 'Esta consulta não é sua.' });
       return;
     }
 
     await pool.execute('DELETE FROM appointments WHERE id = ?', [String(req.params.id)]);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Cancela a consulta. Vale para o responsável (principal ou em guarda compartilhada) e
+ * para o profissional dela; o outro lado é avisado por notificação e e-mail.
+ */
+router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
+  try {
+    const existing = await loadAppointmentById(pool, String(req.params.id));
+    if (!existing) {
+      res.status(404).json({ message: 'Consulta não encontrada.' });
+      return;
+    }
+
+    if (!(await canManageAppointment(req.user, existing))) {
+      res.status(403).json({ message: 'Esta consulta não é sua.' });
+      return;
+    }
+
+    if (existing.status === 'cancelled') {
+      res.status(400).json({ message: 'Esta consulta já está cancelada.' });
+      return;
+    }
+
+    if (existing.status === 'completed') {
+      res.status(400).json({ message: 'Não dá para cancelar uma consulta já realizada.' });
+      return;
+    }
+
+    const reason = asTrimmedString(req.body?.reason).slice(0, 300);
+    await pool.execute('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', existing.id]);
+
+    const { tutor, professional } = await loadAppointmentContacts(existing);
+    const cancelledByTutor = req.user?.userType === 'tutor';
+
+    // Quem cancelou pode ser um responsável com guarda compartilhada, e não o dono:
+    // o aviso precisa dizer o nome de quem realmente cancelou.
+    let who = cancelledByTutor ? 'O responsável' : professional?.name ?? 'O profissional';
+    if (cancelledByTutor && req.user) {
+      const actingTutor = await findTutorByUserId(req.user.id);
+      who = actingTutor?.name ?? tutor?.name ?? who;
+    }
+
+    const target = cancelledByTutor ? professional : tutor;
+    const isoDate = formatDate(existing.appointment_date);
+    const dateLabel = isoDate ? new Date(`${isoDate}T00:00:00`).toLocaleDateString('pt-BR') : String(existing.appointment_date);
+    const timeLabel = String(existing.appointment_time).slice(0, 5);
+
+    const lines: Array<[string, string]> = [
+      ['Pet', existing.pet_name],
+      ['Data', dateLabel],
+      ['Horário', timeLabel],
+      ['Cancelada por', who],
+    ];
+    if (reason) lines.push(['Motivo', reason]);
+
+    if (target?.userId) {
+      await pool.execute(
+        `INSERT INTO notifications (id, user_id, pet_id, appointment_id, source_key, type, title, message, notification_date)
+         VALUES (?, ?, ?, ?, ?, 'appointment', ?, ?, CURRENT_DATE)`,
+        [
+          randomUUID(),
+          target.userId,
+          existing.pet_id,
+          existing.id,
+          `appt-cancelled:${existing.id}`,
+          'Consulta cancelada',
+          `${who} cancelou a consulta de ${existing.pet_name} em ${dateLabel} às ${timeLabel}.${
+            reason ? ` Motivo: ${reason}` : ''
+          }`,
+        ]
+      );
+    }
+
+    if (target?.email) {
+      try {
+        await sendEmail(
+          target.email,
+          `Consulta cancelada — ${existing.pet_name}`,
+          appointmentEmailTemplate({
+            title: 'Consulta cancelada',
+            intro: `${who} cancelou esta consulta.`,
+            lines,
+            note: 'O horário voltou a ficar livre na agenda.',
+          })
+        );
+      } catch (mailError) {
+        console.error('Falha ao avisar o cancelamento por e-mail:', mailError);
+      }
+    }
+
+    const updated = await loadAppointmentById(pool, existing.id);
+    res.json({ data: updated ? normalizeAppointment(updated) : null, message: 'Consulta cancelada.' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Contato da outra parte da consulta, para falar por WhatsApp ou e-mail. */
+router.get('/:id/contact', async (req: AuthRequest, res, next) => {
+  try {
+    const existing = await loadAppointmentById(pool, String(req.params.id));
+    if (!existing) {
+      res.status(404).json({ message: 'Consulta não encontrada.' });
+      return;
+    }
+
+    if (!(await canManageAppointment(req.user, existing))) {
+      res.status(403).json({ message: 'Esta consulta não é sua.' });
+      return;
+    }
+
+    const { tutor, professional } = await loadAppointmentContacts(existing);
+    // Cada lado só recebe o contato do outro.
+    const contact = req.user?.userType === 'tutor' ? professional : tutor;
+
+    if (!contact) {
+      res.status(404).json({ message: 'Não há contato cadastrado para esta consulta.' });
+      return;
+    }
+
+    res.json({ data: contact });
   } catch (error) {
     next(error);
   }

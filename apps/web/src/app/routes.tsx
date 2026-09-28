@@ -11,6 +11,7 @@ import ClinicDashboardScreen from './screens/ClinicDashboardScreen';
 import ClinicAgendaScreen from './screens/ClinicAgendaScreen';
 import PetRegistrationByProfessionalScreen from './screens/PetRegistrationByProfessionalScreen';
 import ProfessionalRegisteredPetsScreen from './screens/ProfessionalRegisteredPetsScreen';
+import PaymentsScreen from './screens/PaymentsScreen';
 import ClinicHistoryScreen from './screens/ClinicHistoryScreen';
 import VeterinarianDashboardScreen from './screens/VeterinarianDashboardScreen';
 import VeterinarianScheduleScreen from './screens/VeterinarianScheduleScreen';
@@ -163,6 +164,19 @@ export const router = createBrowserRouter([
   {
     path: '/veterinarian-pets',
     Component: withAllowedUserTypes(ProfessionalRegisteredPetsScreen, ['veterinarian']),
+  },
+  {
+    // Mesma tela para os três perfis: clínica e veterinário lançam, o responsável confere.
+    path: '/clinic-payments',
+    Component: withAllowedUserTypes(PaymentsScreen, ['clinic']),
+  },
+  {
+    path: '/veterinarian-payments',
+    Component: withAllowedUserTypes(PaymentsScreen, ['veterinarian']),
+  },
+  {
+    path: '/payments',
+    Component: withAllowedUserTypes(PaymentsScreen, ['owner']),
   },
   {
     path: '/clinic-agenda',

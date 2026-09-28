@@ -12,6 +12,7 @@ import { getApiBase, getAuthHeaders, type Appointment } from '../context/shared'
 import { TutorShell } from '../components/layout/TutorShell';
 import SearchablePicker, { type SearchablePickerItem } from '../components/forms/SearchablePicker';
 import MonthCalendar from '../components/calendar/MonthCalendar';
+import AppointmentActions from '../components/appointments/AppointmentActions';
 
 const STATUS_LABEL: Record<Appointment['status'], string> = {
   scheduled: 'Agendada',
@@ -839,17 +840,25 @@ export default function AppointmentsScreen() {
           ) : (
             <div className="space-y-3">
               {scheduled.map((appointment) => (
-                <div key={appointment.id} className="flex items-center gap-4 rounded-[24px] border border-border/70 bg-muted/25 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Calendar className="h-6 w-6" /></div>
-                  <div className="flex-1">
-                    <p className="mb-1 text-foreground">{appointment.petName}</p>
-                    <p className="text-sm text-muted-foreground">{appointment.reason}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{appointment.veterinarianName || appointment.clinicName}</p>
+                <div key={appointment.id} className="rounded-[24px] border border-border/70 bg-muted/25 p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Calendar className="h-6 w-6" /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="mb-1 text-foreground">{appointment.petName}</p>
+                      <p className="text-sm text-muted-foreground">{appointment.reason}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{appointment.veterinarianName || appointment.clinicName}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-foreground">{appointment.date}</p>
+                      <p className="text-sm text-muted-foreground">{appointment.time}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-foreground">{appointment.date}</p>
-                    <p className="text-sm text-muted-foreground">{appointment.time}</p>
-                  </div>
+                  <AppointmentActions
+                    appointmentId={appointment.id}
+                    petName={appointment.petName}
+                    status={appointment.status}
+                    contactLabel="Falar com o profissional"
+                  />
                 </div>
               ))}
             </div>

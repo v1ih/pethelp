@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import {
   Bell,
   CalendarDays,
+  CircleDollarSign,
   ClipboardList,
   HelpCircle,
   Home,
@@ -19,7 +20,7 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 
-type ClinicNavKey = 'dashboard' | 'registration' | 'registered' | 'veterinarians' | 'agenda' | 'history' | 'settings' | 'notifications';
+type ClinicNavKey = 'dashboard' | 'registration' | 'registered' | 'veterinarians' | 'agenda' | 'payments' | 'history' | 'settings' | 'notifications';
 
 type ClinicShellProps = React.PropsWithChildren<{
   active: ClinicNavKey;
@@ -78,6 +79,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
     { key: 'registered', label: 'Pets cadastrados', icon: PawPrint, path: '/clinic-pets' },
     { key: 'veterinarians', label: 'Veterinários', icon: Stethoscope, path: '/clinic-veterinarians' },
     { key: 'agenda', label: 'Agenda', icon: CalendarDays, path: '/clinic-agenda' },
+    { key: 'payments', label: 'Pagamentos', icon: CircleDollarSign, path: '/clinic-payments' },
     { key: 'history', label: 'Histórico', icon: ClipboardList, path: '/clinic-history' },
     { key: 'settings', label: 'Config.', icon: Settings, path: '/clinic-settings' },
   ];

@@ -2,10 +2,20 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { useSession } from './SessionContext';
 import { getApiBase, getAuthHeaders, type Appointment, type Notification } from './shared';
 
+/** Contato da outra parte de uma consulta, para falar por WhatsApp ou e-mail. */
+export type AppointmentContact = {
+  kind: 'tutor' | 'veterinarian' | 'clinic';
+  name: string;
+  email: string | null;
+  phone: string | null;
+};
+
 interface InteractionContextValue {
   appointments: Appointment[];
   addAppointment: (appointment: Omit<Appointment, 'id'>) => Promise<void>;
   updateAppointment: (id: string, appointment: Partial<Appointment>) => Promise<void>;
+  cancelAppointment: (id: string, reason?: string) => Promise<void>;
+  getAppointmentContact: (id: string) => Promise<AppointmentContact>;
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id'>) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
@@ -164,6 +174,40 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /**
+   * Cancela pela rota dedicada: é ela que avisa o outro lado (responsável ou
+   * profissional) por notificação e e-mail, sem duplicar aviso para quem cancelou.
+   */
+  const cancelAppointment = async (id: string, reason?: string) => {
+    const resp = await fetch(`${API_BASE}/api/appointments/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ reason: reason ?? '' }),
+    });
+
+    const payload = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(payload?.message ?? 'Não foi possível cancelar a consulta.');
+    }
+
+    if (payload?.data) {
+      const updated = toUiAppointment(payload.data);
+      setAppointments((prev) => prev.map((item) => (item.id === id ? { ...item, ...updated } : item)));
+    } else {
+      setAppointments((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'cancelled' } : item)));
+    }
+  };
+
+  /** Contato da outra parte da consulta (nome, e-mail e telefone). */
+  const getAppointmentContact = async (id: string) => {
+    const resp = await fetch(`${API_BASE}/api/appointments/${id}/contact`, { headers: getAuthHeaders() });
+    const payload = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new Error(payload?.message ?? 'Não foi possível carregar o contato.');
+    }
+    return payload.data as AppointmentContact;
+  };
+
   const updateAppointment = async (id: string, appointmentUpdate: Partial<Appointment>) => {
     const resp = await fetch(`${API_BASE}/api/appointments/${id}`, {
       method: 'PATCH',
@@ -266,6 +310,8 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
         appointments,
         addAppointment,
         updateAppointment,
+        cancelAppointment,
+        getAppointmentContact,
         notifications,
         addNotification,
         markNotificationAsRead,
