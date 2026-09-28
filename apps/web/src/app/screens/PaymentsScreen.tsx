@@ -1,5 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleDollarSign, FileDown, FileText, Plus, RefreshCw, Trash2, Undo2, X } from 'lucide-react';
+import {
+  CalendarCheck,
+  CheckCircle2,
+  CircleDollarSign,
+  FileDown,
+  FileText,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfessionalShell } from '../components/layout/ProfessionalShell';
 import { TutorShell } from '../components/layout/TutorShell';
@@ -28,12 +39,37 @@ type Payment = {
   amountCents: number;
   amountLabel: string;
   status: PaymentStatus;
+  category: string;
+  categoryLabel: string;
   method: string | null;
   methodLabel: string | null;
+  serviceDate: string | null;
   dueDate: string | null;
   paidAt: string | null;
   notes: string | null;
   createdAt: string;
+};
+
+/** Serviço da tabela de preços, para preencher a cobrança em um clique. */
+type PriceItem = {
+  id: string;
+  name: string;
+  category: string;
+  categoryLabel: string;
+  amountCents: number;
+};
+
+/** Somas que o servidor devolve junto da lista: por tipo e por forma de pagamento. */
+type Summary = {
+  byCategory: Array<{
+    category: string;
+    label: string;
+    count: number;
+    totalCents: number;
+    paidCents: number;
+    pendingCents: number;
+  }>;
+  byMethod: Array<{ method: string; label: string; count: number; totalCents: number }>;
 };
 
 /** Responsável atendido pelo profissional, com os pets dele. */
@@ -51,6 +87,19 @@ const METHODS = [
   { value: 'credito', label: 'Cartão de crédito' },
   { value: 'debito', label: 'Cartão de débito' },
   { value: 'transferencia', label: 'Transferência' },
+  { value: 'outro', label: 'Outro' },
+];
+
+/** Mesmos tipos aceitos pelo servidor (price-items/payments). */
+const CATEGORIES = [
+  { value: 'consulta', label: 'Consulta' },
+  { value: 'vacina', label: 'Vacina' },
+  { value: 'exame', label: 'Exame' },
+  { value: 'cirurgia', label: 'Cirurgia' },
+  { value: 'internacao', label: 'Internação' },
+  { value: 'banho_tosa', label: 'Banho e tosa' },
+  { value: 'medicamento', label: 'Medicamento' },
+  { value: 'retorno', label: 'Retorno' },
   { value: 'outro', label: 'Outro' },
 ];
 
@@ -89,6 +138,10 @@ export default function PaymentsScreen() {
   const [filter, setFilter] = useState<'all' | PaymentStatus>('all');
   // Competência no formato YYYY-MM; vazio = todos os meses.
   const [month, setMonth] = useState('');
+  // Dia no formato YYYY-MM-DD. Quando preenchido, manda no mês: é o fechamento de caixa.
+  const [day, setDay] = useState('');
+  const [summary, setSummary] = useState<Summary>({ byCategory: [], byMethod: [] });
+  const [priceItems, setPriceItems] = useState<PriceItem[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [tutorId, setTutorId] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -103,21 +156,26 @@ export default function PaymentsScreen() {
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [markPaid, setMarkPaid] = useState(false);
+  const [category, setCategory] = useState('consulta');
+  const [priceItemId, setPriceItemId] = useState('');
+  const [serviceDate, setServiceDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const query = month ? `?month=${month}` : '';
+      // O dia manda no mês: quem escolheu um dia está fechando o caixa daquele dia.
+      const query = day ? `?day=${day}` : month ? `?month=${month}` : '';
       const resp = await fetch(`${API_BASE}/api/payments${query}`, { headers: getAuthHeaders() });
       const payload = await resp.json().catch(() => null);
       if (!resp.ok) throw new Error(payload?.message ?? 'Não foi possível carregar os pagamentos.');
       setPayments((payload?.data ?? []) as Payment[]);
+      setSummary({ byCategory: payload?.byCategory ?? [], byMethod: payload?.byMethod ?? [] });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível carregar os pagamentos.');
     } finally {
       setLoading(false);
     }
-  }, [API_BASE, month]);
+  }, [API_BASE, month, day]);
 
   useEffect(() => {
     void load();
@@ -136,6 +194,27 @@ export default function PaymentsScreen() {
         if (!cancelled) setClients((payload?.data ?? []) as Client[]);
       } catch {
         // Sem a lista, o formulário ainda funciona sem vincular pet.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [API_BASE, isTutor]);
+
+  // Tabela de preços: preenche descrição, valor e tipo sem digitar.
+  useEffect(() => {
+    if (isTutor) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/api/price-items`, { headers: getAuthHeaders() });
+        if (!resp.ok) return;
+        const payload = await resp.json();
+        if (!cancelled) setPriceItems((payload?.data ?? []) as PriceItem[]);
+      } catch {
+        // Sem a tabela, o formulário segue aceitando descrição e valor digitados.
       }
     })();
 
@@ -166,9 +245,11 @@ export default function PaymentsScreen() {
     return options;
   }, []);
 
-  const periodLabel = month
-    ? monthOptions.find((option) => option.value === month)?.label ?? month
-    : 'Todo o período';
+  const periodLabel = day
+    ? `Dia ${new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR')}`
+    : month
+      ? monthOptions.find((option) => option.value === month)?.label ?? month
+      : 'Todo o período';
 
   const toPdfItems = (items: Payment[]): PaymentPdfItem[] =>
     items.map((item) => ({
@@ -177,11 +258,13 @@ export default function PaymentsScreen() {
       amountCents: item.amountCents,
       amountLabel: item.amountLabel,
       status: item.status,
+      categoryLabel: item.categoryLabel,
       method: item.method,
       methodLabel: item.methodLabel,
       petName: item.petName,
       tutorName: item.tutorName,
       professionalName: item.professionalName,
+      serviceDate: item.serviceDate,
       dueDate: item.dueDate,
       paidAt: item.paidAt,
       notes: item.notes,
@@ -202,13 +285,42 @@ export default function PaymentsScreen() {
     if (exporting) return;
     setExporting(true);
     try {
+      // Com filtro de situação ativo, o resumo tem que bater com o que está na tela.
+      const groupsFromVisible = filter !== 'all';
+      const byCategory = groupsFromVisible
+        ? Array.from(
+            visible.reduce((map, item) => {
+              const current = map.get(item.categoryLabel) ?? { label: item.categoryLabel, count: 0, totalCents: 0 };
+              current.count += 1;
+              current.totalCents += item.amountCents;
+              map.set(item.categoryLabel, current);
+              return map;
+            }, new Map<string, { label: string; count: number; totalCents: number }>())
+          ).map(([, value]) => value)
+        : summary.byCategory.map((entry) => ({
+            label: entry.label,
+            count: entry.count,
+            totalCents: entry.totalCents,
+          }));
+
+      const byMethod = groupsFromVisible
+        ? []
+        : summary.byMethod.map((entry) => ({ label: entry.label, count: entry.count, totalCents: entry.totalCents }));
+
       const result = await buildPaymentsStatementPdf({
         payments: toPdfItems(visible),
         periodLabel,
         ownerLabel: (isTutor ? user?.name : user?.clinicName || user?.name) ?? 'PetHelp',
         forTutor: isTutor,
+        byCategory,
+        byMethod,
+        title: day && !isTutor ? 'Fechamento do dia' : 'Extrato de pagamentos',
       });
-      presentPdf(result, `PetHelp — extrato ${periodLabel}`, `Extrato · ${periodLabel}`);
+      presentPdf(
+        result,
+        `PetHelp — ${day && !isTutor ? 'fechamento' : 'extrato'} ${periodLabel}`,
+        `${day && !isTutor ? 'Fechamento' : 'Extrato'} · ${periodLabel}`
+      );
     } catch (error) {
       console.error('Falha ao gerar o extrato:', error);
       toast.error('Não foi possível gerar o extrato.');
@@ -234,6 +346,9 @@ export default function PaymentsScreen() {
     setDueDate('');
     setNotes('');
     setMarkPaid(false);
+    setPriceItemId('');
+    setCategory('consulta');
+    setServiceDate(new Date().toISOString().slice(0, 10));
     setShowForm(false);
   };
 
@@ -250,6 +365,9 @@ export default function PaymentsScreen() {
           description: description.trim(),
           amount: amount.trim(),
           petId: petId || null,
+          priceItemId: priceItemId || null,
+          category,
+          serviceDate: serviceDate || null,
           method: method || null,
           dueDate: dueDate || null,
           notes: notes.trim() || null,
@@ -326,16 +444,21 @@ export default function PaymentsScreen() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
           <label htmlFor="paymentsMonth" className="mb-2 block text-sm text-foreground">
             Mês
           </label>
           <select
             id="paymentsMonth"
             value={month}
-            onChange={(event) => setMonth(event.target.value)}
-            className={`${inputClass} first-letter:uppercase`}
+            onChange={(event) => {
+              setMonth(event.target.value);
+              // Mês escolhido na mão substitui o recorte de um dia só.
+              setDay('');
+            }}
+            disabled={Boolean(day)}
+            className={`${inputClass} first-letter:uppercase disabled:opacity-60`}
           >
             <option value="">Todo o período</option>
             {monthOptions.map((option) => (
@@ -345,16 +468,95 @@ export default function PaymentsScreen() {
             ))}
           </select>
         </div>
+
+        <div>
+          <label htmlFor="paymentsDay" className="mb-2 block text-sm text-foreground">
+            Dia
+          </label>
+          <input
+            id="paymentsDay"
+            type="date"
+            value={day}
+            onChange={(event) => setDay(event.target.value)}
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {!isTutor ? (
+          <button
+            type="button"
+            onClick={() => {
+              setDay(new Date().toISOString().slice(0, 10));
+              setFilter('all');
+            }}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted"
+          >
+            <CalendarCheck className="h-5 w-5" />
+            Fechamento de hoje
+          </button>
+        ) : null}
+
+        {day ? (
+          <button
+            type="button"
+            onClick={() => setDay('')}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-muted-foreground transition-colors hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+            Limpar o dia
+          </button>
+        ) : null}
+
         <button
           type="button"
           onClick={() => void handleStatementPdf()}
           disabled={exporting}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[18px] border border-border bg-card px-5 py-3 text-foreground transition-colors hover:bg-muted disabled:opacity-60 sm:ml-auto"
         >
           <FileText className="h-5 w-5" />
-          {exporting ? 'Gerando...' : 'Extrato em PDF'}
+          {exporting ? 'Gerando...' : day && !isTutor ? 'Fechamento em PDF' : 'Extrato em PDF'}
         </button>
       </div>
+
+      {summary.byCategory.length > 0 ? (
+        <section className="rounded-[24px] border border-border/70 bg-card p-4 sm:p-5">
+          <h2 className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
+            {periodLabel} · por tipo de serviço
+          </h2>
+          <div className="mt-3 space-y-2">
+            {summary.byCategory.map((entry) => (
+              <div key={entry.category} className="flex items-center justify-between gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0">
+                <span className="min-w-0 truncate text-foreground">
+                  {entry.label}
+                  <span className="ml-2 text-sm text-muted-foreground">{entry.count}x</span>
+                </span>
+                <span className="shrink-0 text-foreground">{formatMoneyFromCents(entry.totalCents)}</span>
+              </div>
+            ))}
+          </div>
+
+          {summary.byMethod.length > 0 ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <h3 className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
+                {isTutor ? 'Pago por forma' : 'Recebido por forma'}
+              </h3>
+              <div className="mt-2 space-y-2">
+                {summary.byMethod.map((entry) => (
+                  <div key={entry.method} className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-muted-foreground">
+                      {entry.label}
+                      <span className="ml-2 text-sm">{entry.count}x</span>
+                    </span>
+                    <span className="shrink-0 text-foreground">{formatMoneyFromCents(entry.totalCents)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
         {(['all', 'pending', 'paid', 'cancelled'] as const).map((value) => (
@@ -386,6 +588,39 @@ export default function PaymentsScreen() {
           </div>
 
           <div className="mt-4 grid gap-4">
+            {priceItems.length > 0 ? (
+              <div>
+                <label htmlFor="paymentPriceItem" className="mb-2 block text-foreground">
+                  Serviço da tabela de preços
+                </label>
+                <select
+                  id="paymentPriceItem"
+                  value={priceItemId}
+                  onChange={(event) => {
+                    const selected = priceItems.find((item) => item.id === event.target.value);
+                    setPriceItemId(event.target.value);
+                    // Escolher o serviço já preenche descrição, valor e tipo.
+                    if (selected) {
+                      setDescription(selected.name);
+                      setAmount((selected.amountCents / 100).toFixed(2).replace('.', ','));
+                      setCategory(selected.category);
+                    }
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">Digitar manualmente</option>
+                  {priceItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} — {formatMoneyFromCents(item.amountCents)}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Você pode ajustar o valor depois de escolher, se este atendimento foi diferente.
+                </p>
+              </div>
+            ) : null}
+
             <div>
               <label htmlFor="paymentDescription" className="mb-2 block text-foreground">
                 O que foi realizado <span className="text-destructive">*</span>
@@ -505,6 +740,42 @@ export default function PaymentsScreen() {
               </div>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="paymentCategory" className="mb-2 block text-foreground">
+                  Tipo de serviço
+                </label>
+                <select
+                  id="paymentCategory"
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                  className={inputClass}
+                >
+                  {CATEGORIES.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  É por aqui que sai a soma do dia por consulta, vacina, exame...
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="paymentServiceDate" className="mb-2 block text-foreground">
+                  Data do atendimento
+                </label>
+                <input
+                  id="paymentServiceDate"
+                  type="date"
+                  value={serviceDate}
+                  onChange={(event) => setServiceDate(event.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
             <div>
               <label htmlFor="paymentNotes" className="mb-2 block text-foreground">
                 Observações
@@ -572,10 +843,19 @@ export default function PaymentsScreen() {
                 <div className="min-w-0">
                   <p className="text-base font-medium text-foreground">{payment.description}</p>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {[payment.petName, isTutor ? payment.professionalName : payment.tutorName]
+                    {[
+                      payment.categoryLabel,
+                      payment.petName,
+                      isTutor ? payment.professionalName : payment.tutorName,
+                    ]
                       .filter(Boolean)
                       .join(' · ') || 'Sem pet vinculado'}
                   </p>
+                  {payment.serviceDate ? (
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      Atendimento em {formatDay(payment.serviceDate)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-medium text-foreground">{payment.amountLabel}</p>

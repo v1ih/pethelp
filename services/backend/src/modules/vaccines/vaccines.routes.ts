@@ -5,6 +5,8 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { canAccessPetHealthData } from '../pets/pet-access.js';
+import { blockTutorEditingProfessionalEntry } from '../pets/record-ownership.js';
+import { diffFields, recordAudit } from '../audit/audit.service.js';
 
 type VaccineRow = RowDataPacket & {
   id: string;
@@ -235,6 +237,16 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    await recordAudit({
+      user: req.user,
+      entityType: 'vaccine',
+      entityId: created.id,
+      petId: created.pet_id,
+      action: 'create',
+      summary: `Vacina "${created.name}" registrada`,
+      changes: [{ field: 'appliedDate', label: 'Data de aplicação', from: null, to: formatDate(created.applied_date) }],
+    });
+
     res.status(201).json({ data: normalizeVaccine(created) });
   } catch (error) {
     await connection.rollback();
@@ -257,6 +269,12 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     const access = await canAccessPetHealthData(req.user, existing.pet_id, 'vaccines');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
+      return;
+    }
+
+    const blocked = blockTutorEditingProfessionalEntry(req.user, existing.added_by, 'esta vacina');
+    if (blocked) {
+      res.status(403).json({ message: blocked });
       return;
     }
 
@@ -345,6 +363,43 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    const changes = diffFields(
+      {
+        name: existing.name,
+        appliedDate: formatDate(existing.applied_date),
+        nextDoseDate: existing.next_dose_date ? formatDate(existing.next_dose_date) : null,
+        veterinarianName: existing.veterinarian_name,
+        clinicName: existing.clinic_name,
+        photo: existing.photo ? 'com foto' : 'sem foto',
+      },
+      {
+        name: updated.name,
+        appliedDate: formatDate(updated.applied_date),
+        nextDoseDate: updated.next_dose_date ? formatDate(updated.next_dose_date) : null,
+        veterinarianName: updated.veterinarian_name,
+        clinicName: updated.clinic_name,
+        photo: updated.photo ? 'com foto' : 'sem foto',
+      },
+      {
+        name: 'Vacina',
+        appliedDate: 'Data de aplicação',
+        nextDoseDate: 'Próxima dose',
+        veterinarianName: 'Veterinário',
+        clinicName: 'Clínica',
+        photo: 'Foto',
+      }
+    );
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'vaccine',
+      entityId: updated.id,
+      petId: updated.pet_id,
+      action: 'update',
+      summary: `Vacina "${updated.name}" alterada`,
+      changes,
+    });
+
     res.json({ data: normalizeVaccine(updated) });
   } catch (error) {
     await connection.rollback();
@@ -370,6 +425,12 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    const blocked = blockTutorEditingProfessionalEntry(req.user, existing.added_by, 'esta vacina');
+    if (blocked) {
+      res.status(403).json({ message: blocked });
+      return;
+    }
+
     // Soft-delete: o RNF09 do TCC proíbe exclusão física de registros de saúde.
     const [result] = await connection.execute<ResultSetHeader>(
       'UPDATE vaccines SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL',
@@ -380,6 +441,15 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       res.status(404).json({ message: 'Vaccine not found' });
       return;
     }
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'vaccine',
+      entityId: existing.id,
+      petId: existing.pet_id,
+      action: 'delete',
+      summary: `Vacina "${existing.name}" removida`,
+    });
 
     res.status(204).send();
   } catch (error) {

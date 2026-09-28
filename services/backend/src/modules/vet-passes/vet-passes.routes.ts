@@ -413,9 +413,12 @@ router.delete('/:code', async (req: AuthRequest, res, next) => {
 
     let unlinkedClinicName: string | null = null;
     if (holderClinic) {
+      // A clínica que cadastrou o pet não perde o acesso: o cadastro é atendimento dela.
       const [unlink] = await pool.execute<ResultSetHeader>(
-        'UPDATE pets SET linked_clinic_id = NULL WHERE id = ? AND linked_clinic_id = ?',
-        [pass.pet_id, String(holderClinic.id)]
+        `UPDATE pets SET linked_clinic_id = NULL
+         WHERE id = ? AND linked_clinic_id = ?
+           AND (registered_by_clinic_id IS NULL OR registered_by_clinic_id <> ?)`,
+        [pass.pet_id, String(holderClinic.id), String(holderClinic.id)]
       );
       if ((unlink.affectedRows ?? 0) > 0) {
         unlinkedClinicName = String(holderClinic.trade_name);

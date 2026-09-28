@@ -12,6 +12,7 @@ import ClinicAgendaScreen from './screens/ClinicAgendaScreen';
 import PetRegistrationByProfessionalScreen from './screens/PetRegistrationByProfessionalScreen';
 import ProfessionalRegisteredPetsScreen from './screens/ProfessionalRegisteredPetsScreen';
 import PaymentsScreen from './screens/PaymentsScreen';
+import PriceTableScreen from './screens/PriceTableScreen';
 import ClinicHistoryScreen from './screens/ClinicHistoryScreen';
 import VeterinarianDashboardScreen from './screens/VeterinarianDashboardScreen';
 import VeterinarianScheduleScreen from './screens/VeterinarianScheduleScreen';
@@ -153,6 +154,13 @@ export const router = createBrowserRouter([
     Component: withAllowedUserTypes(PetRegistrationByProfessionalScreen, ['clinic']),
   },
   {
+    path: '/clinic-prices',
+    Component: withAllowedUserTypes(PriceTableScreen, ['clinic']),
+  },
+  {
+    path: '/veterinarian-prices',
+    Component: withAllowedUserTypes(PriceTableScreen, ['veterinarian']),
+  },  {
     path: '/clinic-pets',
     Component: withAllowedUserTypes(ProfessionalRegisteredPetsScreen, ['clinic']),
   },

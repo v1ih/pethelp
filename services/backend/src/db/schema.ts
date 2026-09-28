@@ -214,6 +214,51 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_payments_clinic ON payments (clinic_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_veterinarian ON payments (veterinarian_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_tutor ON payments (tutor_id, created_at DESC);
+-- Tipo do serviço cobrado. É o que permite fechar o caixa do dia somando por categoria
+-- (consulta, vacina, exame...), que hoje a secretária faz na mão.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS category VARCHAR(20) NOT NULL DEFAULT 'outro';
+-- Data em que o serviço foi feito, que é o que interessa no fechamento do dia:
+-- pode ser diferente do vencimento e de quando o pagamento entrou.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS service_date DATE;
+UPDATE payments SET service_date = COALESCE(due_date, created_at::date) WHERE service_date IS NULL;
+CREATE INDEX IF NOT EXISTS idx_payments_service_date ON payments (service_date DESC);
+
+-- Tabela de preços da clínica / do veterinário autônomo. Serve de base para lançar
+-- cobranças sem digitar valor toda vez.
+CREATE TABLE IF NOT EXISTS price_items (
+  id UUID PRIMARY KEY,
+  clinic_id UUID REFERENCES clinics(id) ON DELETE CASCADE,
+  veterinarian_id UUID REFERENCES veterinarians(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  category VARCHAR(20) NOT NULL DEFAULT 'outro',
+  amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
+  notes TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT chk_price_item_owner CHECK (clinic_id IS NOT NULL OR veterinarian_id IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_price_items_clinic ON price_items (clinic_id, is_active, name);
+CREATE INDEX IF NOT EXISTS idx_price_items_veterinarian ON price_items (veterinarian_id, is_active, name);
+
+-- Registro de quem mexeu em quê. A clínica precisa conseguir mostrar, depois, que
+-- determinada informação foi lançada ou alterada por tal pessoa, em tal momento.
+-- Nunca é apagado nem editado pelo app: só INSERT e leitura.
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID PRIMARY KEY,
+  pet_id UUID REFERENCES pets(id) ON DELETE SET NULL,
+  entity_type VARCHAR(30) NOT NULL,
+  entity_id UUID,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('create','update','delete')),
+  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  actor_role VARCHAR(20),
+  actor_name VARCHAR(180),
+  summary VARCHAR(255) NOT NULL,
+  changes JSONB,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_pet ON audit_logs (pet_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity_type, entity_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = CURRENT_TIMESTAMP; RETURN NEW; END; $$ LANGUAGE plpgsql;
@@ -232,4 +277,5 @@ DROP TRIGGER IF EXISTS referrals_updated_at ON referrals; CREATE TRIGGER referra
 DROP TRIGGER IF EXISTS notifications_updated_at ON notifications; CREATE TRIGGER notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS vet_passes_updated_at ON vet_passes; CREATE TRIGGER vet_passes_updated_at BEFORE UPDATE ON vet_passes FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 DROP TRIGGER IF EXISTS payments_updated_at ON payments; CREATE TRIGGER payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+DROP TRIGGER IF EXISTS price_items_updated_at ON price_items; CREATE TRIGGER price_items_updated_at BEFORE UPDATE ON price_items FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 `;

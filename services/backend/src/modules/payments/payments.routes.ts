@@ -6,6 +6,13 @@ import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { findClinicByUserId, findTutorByUserId, findVeterinarianByUserId } from '../users/users.service.js';
 import { sendEmail } from '../mail/mailer.js';
+import {
+  CATEGORY_LABELS,
+  SERVICE_CATEGORIES,
+  normalizeCategory,
+  type ServiceCategory,
+} from '../price-items/price-items.routes.js';
+import { diffFields, recordAudit } from '../audit/audit.service.js';
 
 /**
  * Cobranças de clínicas e veterinários: o que foi feito, quanto custou, se já foi pago
@@ -39,6 +46,8 @@ type PaymentRow = RowDataPacket & {
   amount_cents: number;
   status: 'pending' | 'paid' | 'cancelled';
   method: Method | null;
+  category: ServiceCategory;
+  service_date: Date | string | null;
   due_date: Date | string | null;
   paid_at: Date | string | null;
   notes: string | null;
@@ -99,6 +108,12 @@ function parseDueDate(value: unknown) {
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
+/** Categoria vinda da query string: só filtra quando veio uma categoria conhecida. */
+function normalizeCategoryFilter(value: unknown): ServiceCategory | null {
+  const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return (SERVICE_CATEGORIES as readonly string[]).includes(text) ? (text as ServiceCategory) : null;
+}
+
 async function resolveProfessional(user: AuthRequest['user']): Promise<Professional | null> {
   if (!user) return null;
 
@@ -131,8 +146,11 @@ function normalizePayment(row: PaymentRow) {
     amountCents: Number(row.amount_cents),
     amountLabel: formatMoney(Number(row.amount_cents)),
     status: row.status,
+    category: row.category ?? 'outro',
+    categoryLabel: CATEGORY_LABELS[(row.category ?? 'outro') as ServiceCategory] ?? CATEGORY_LABELS.outro,
     method: row.method,
     methodLabel: row.method ? METHOD_LABELS[row.method] : null,
+    serviceDate: formatDay(row.service_date),
     dueDate: formatDay(row.due_date),
     paidAt: row.paid_at ? new Date(row.paid_at as string).toISOString() : null,
     notes: row.notes,
@@ -351,25 +369,84 @@ router.get('/', async (req: AuthRequest, res, next) => {
       values.push(status);
     }
 
-    // Filtro por competência: 'YYYY-MM' devolve o que foi lançado naquele mês.
-    const month = asTrimmedString(req.query.month, 7);
-    if (/^\d{4}-\d{2}$/.test(month)) {
-      filters.push(`p.created_at >= ?::date AND p.created_at < (?::date + INTERVAL '1 month')`);
-      values.push(`${month}-01`, `${month}-01`);
+    // A data que interessa no fechamento é a do atendimento, não a do lançamento:
+    // uma cobrança digitada no dia seguinte continua pertencendo ao dia em que foi feita.
+    const serviceDay = `COALESCE(p.service_date, p.due_date, p.created_at::date)`;
+
+    // Filtro por dia: 'YYYY-MM-DD' — é o fechamento de caixa da secretária.
+    const day = asTrimmedString(req.query.day, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      filters.push(`${serviceDay} = ?::date`);
+      values.push(day);
+    } else {
+      // Filtro por competência: 'YYYY-MM' devolve o mês inteiro.
+      const month = asTrimmedString(req.query.month, 7);
+      if (/^\d{4}-\d{2}$/.test(month)) {
+        filters.push(`${serviceDay} >= ?::date AND ${serviceDay} < (?::date + INTERVAL '1 month')`);
+        values.push(`${month}-01`, `${month}-01`);
+      }
+    }
+
+    const category = normalizeCategoryFilter(req.query.category);
+    if (category) {
+      filters.push('p.category = ?');
+      values.push(category);
+    }
+
+    const petId = asTrimmedString(req.query.petId, 60);
+    if (petId) {
+      filters.push('p.pet_id = ?');
+      values.push(petId);
     }
 
     const [rows] = await pool.query<PaymentRow[]>(
-      `${SELECT_PAYMENT} WHERE ${filters.join(' AND ')} ORDER BY p.created_at DESC LIMIT 300`,
+      `${SELECT_PAYMENT} WHERE ${filters.join(' AND ')} ORDER BY ${serviceDay} DESC, p.created_at DESC LIMIT 500`,
       values
     );
 
     const data = rows.map(normalizePayment);
+
+    // Soma por tipo de serviço: é o que a secretária monta na mão hoje.
+    const byCategory = SERVICE_CATEGORIES.map((key) => {
+      const items = data.filter((item) => item.category === key);
+      return {
+        category: key,
+        label: CATEGORY_LABELS[key],
+        count: items.length,
+        totalCents: items.reduce((sum, item) => sum + item.amountCents, 0),
+        paidCents: items
+          .filter((item) => item.status === 'paid')
+          .reduce((sum, item) => sum + item.amountCents, 0),
+        pendingCents: items
+          .filter((item) => item.status === 'pending')
+          .reduce((sum, item) => sum + item.amountCents, 0),
+      };
+    }).filter((entry) => entry.count > 0);
+
+    // Soma por forma de pagamento, do que já foi recebido: fecha com o caixa e a maquininha.
+    const paidItems = data.filter((item) => item.status === 'paid');
+    const byMethod = METHODS.map((key) => {
+      const items = paidItems.filter((item) => item.method === key);
+      return {
+        method: key,
+        label: METHOD_LABELS[key],
+        count: items.length,
+        totalCents: items.reduce((sum, item) => sum + item.amountCents, 0),
+      };
+    }).filter((entry) => entry.count > 0);
+
     res.json({
       data,
       totals: {
         pendingCents: data.filter((item) => item.status === 'pending').reduce((sum, item) => sum + item.amountCents, 0),
-        paidCents: data.filter((item) => item.status === 'paid').reduce((sum, item) => sum + item.amountCents, 0),
+        paidCents: paidItems.reduce((sum, item) => sum + item.amountCents, 0),
+        cancelledCents: data
+          .filter((item) => item.status === 'cancelled')
+          .reduce((sum, item) => sum + item.amountCents, 0),
+        count: data.length,
       },
+      byCategory,
+      byMethod,
     });
   } catch (error) {
     next(error);
@@ -386,8 +463,27 @@ router.post('/', async (req: AuthRequest, res, next) => {
     }
 
     const body = req.body ?? {};
-    const description = asTrimmedString(body.description);
-    const amountCents = parseAmountCents(body.amount ?? body.amountCents);
+
+    // Item da tabela de preços: preenche descrição, valor e categoria de uma vez.
+    const priceItemId = asTrimmedString(body.priceItemId, 60);
+    let priceItem: { name: string; amount_cents: number; category: ServiceCategory } | null = null;
+    if (priceItemId) {
+      const [priceRows] = await pool.query<RowDataPacket[]>(
+        `SELECT name, amount_cents, category FROM price_items
+         WHERE id = ? AND ${professional.kind === 'clinic' ? 'clinic_id' : 'veterinarian_id'} = ? LIMIT 1`,
+        [priceItemId, professional.id]
+      );
+      if (!priceRows.length) {
+        res.status(404).json({ message: 'Serviço não encontrado na sua tabela de preços.' });
+        return;
+      }
+      priceItem = priceRows[0] as { name: string; amount_cents: number; category: ServiceCategory };
+    }
+
+    const description = asTrimmedString(body.description) || (priceItem ? String(priceItem.name) : '');
+    const amountCents =
+      parseAmountCents(body.amount ?? body.amountCents) ?? (priceItem ? Number(priceItem.amount_cents) : null);
+    const category = body.category !== undefined || !priceItem ? normalizeCategory(body.category) : priceItem.category;
 
     if (!description) {
       res.status(400).json({ message: 'Descreva o que foi realizado.' });
@@ -438,8 +534,8 @@ router.post('/', async (req: AuthRequest, res, next) => {
     await pool.execute(
       `INSERT INTO payments (
          id, pet_id, tutor_id, appointment_id, clinic_id, veterinarian_id,
-         description, amount_cents, status, method, due_date, paid_at, notes
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${markPaid ? 'CURRENT_TIMESTAMP' : 'NULL'}, ?)`,
+         description, amount_cents, status, method, category, service_date, due_date, paid_at, notes
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${markPaid ? 'CURRENT_TIMESTAMP' : 'NULL'}, ?)`,
       [
         id,
         petId,
@@ -451,6 +547,9 @@ router.post('/', async (req: AuthRequest, res, next) => {
         amountCents,
         markPaid ? 'paid' : 'pending',
         method,
+        category,
+        // Sem data informada, o atendimento é de hoje — o caso normal no balcão.
+        parseDueDate(body.serviceDate) ?? new Date().toISOString().slice(0, 10),
         parseDueDate(body.dueDate),
         asTrimmedString(body.notes, 1000) || null,
       ]
@@ -461,6 +560,15 @@ router.post('/', async (req: AuthRequest, res, next) => {
       res.status(500).json({ message: 'Não foi possível registrar a cobrança.' });
       return;
     }
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'payment',
+      entityId: created.id,
+      petId: created.pet_id,
+      action: 'create',
+      summary: `Cobrança de ${formatMoney(Number(created.amount_cents))} lançada (${created.description})`,
+    });
 
     await notifyTutor(created, markPaid ? 'paid' : 'created', professional.displayName);
     res.status(201).json({ data: normalizePayment(created) });
@@ -523,6 +631,16 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       values.push(parseMethod(body.method));
     }
 
+    if (body.category !== undefined) {
+      assignments.push('category = ?');
+      values.push(normalizeCategory(body.category));
+    }
+
+    if (body.serviceDate !== undefined) {
+      assignments.push('service_date = ?');
+      values.push(parseDueDate(body.serviceDate));
+    }
+
     if (body.dueDate !== undefined) {
       assignments.push('due_date = ?');
       values.push(parseDueDate(body.dueDate));
@@ -563,6 +681,48 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     }
 
     const updated = await loadPaymentById(existing.id);
+
+    if (updated) {
+      const changes = diffFields(
+        {
+          description: existing.description,
+          amount: Number(existing.amount_cents) / 100,
+          status: existing.status,
+          method: existing.method,
+          category: existing.category,
+          serviceDate: formatDay(existing.service_date),
+        },
+        {
+          description: updated.description,
+          amount: Number(updated.amount_cents) / 100,
+          status: updated.status,
+          method: updated.method,
+          category: updated.category,
+          serviceDate: formatDay(updated.service_date),
+        },
+        {
+          description: 'Serviço',
+          amount: 'Valor',
+          status: 'Situação',
+          method: 'Forma de pagamento',
+          category: 'Tipo',
+          serviceDate: 'Data do atendimento',
+        }
+      );
+
+      if (changes.length) {
+        await recordAudit({
+          user: req.user,
+          entityType: 'payment',
+          entityId: updated.id,
+          petId: updated.pet_id,
+          action: 'update',
+          summary: `Cobrança "${updated.description}" alterada`,
+          changes,
+        });
+      }
+    }
+
     if (updated && becamePaid) {
       await notifyTutor(updated, 'paid', professional.displayName);
     }

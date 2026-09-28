@@ -7,7 +7,7 @@ import { useSession } from '../../context/SessionContext';
 // mesmo; só o menu lateral muda. Este wrapper escolhe o shell do perfil logado para
 // as telas não precisarem ser duplicadas.
 
-export type ProfessionalNavKey = 'registration' | 'registered' | 'payments';
+export type ProfessionalNavKey = 'registration' | 'registered' | 'payments' | 'prices' | 'agenda';
 
 type ProfessionalShellProps = React.PropsWithChildren<{
   active: ProfessionalNavKey;

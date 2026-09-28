@@ -149,15 +149,27 @@ export default function ConnectionScreen() {
               ? `${currentPet.name} está vinculado a ${currentPet.linkedClinicName}, que por isso acompanha o prontuário, as vacinas e os exames dele.`
               : 'Este pet já possui um vínculo ativo com um estabelecimento, que por isso acompanha o prontuário, as vacinas e os exames dele.'}
           </p>
-          <button
-            type="button"
-            onClick={handleUnlink}
-            disabled={unlinking}
-            className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-background px-5 py-3 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            <Unlink className="h-4 w-4" />
-            {unlinking ? 'Desvinculando...' : 'Desvincular clínica'}
-          </button>
+
+          {/* Vínculo que nasceu do cadastro feito pela clínica não é encerrável aqui:
+              o histórico daquele atendimento é dela. O responsável segue controlando
+              o compartilhamento com as outras clínicas e veterinários. */}
+          {currentPet.clinicLinkFromRegistration ? (
+            <p className="mt-3 rounded-[18px] border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+              Foi esta clínica que cadastrou {currentPet.name} no PetHelp, e por isso ela mantém acesso ao histórico
+              que registrou. Em <strong className="text-foreground">Compartilhamentos</strong> você libera ou encerra
+              o acesso de outras clínicas e veterinários quando quiser.
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={handleUnlink}
+              disabled={unlinking}
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border border-border bg-background px-5 py-3 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              <Unlink className="h-4 w-4" />
+              {unlinking ? 'Desvinculando...' : 'Desvincular clínica'}
+            </button>
+          )}
         </div>
       )}
     </TutorShell>

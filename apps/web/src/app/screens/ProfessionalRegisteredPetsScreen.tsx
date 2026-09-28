@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff } from 'lucide-react';
+import { History, Mail, PawPrint, Phone, RefreshCw, Search, ShieldCheck, ShieldOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { ProfessionalShell } from '../components/layout/ProfessionalShell';
+import PetAuditTrail from '../components/audit/PetAuditTrail';
 import { useSession } from '../context/SessionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
 import { petAgeLabel } from '../utils/age';
@@ -62,6 +63,8 @@ export default function ProfessionalRegisteredPetsScreen() {
   const [pets, setPets] = useState<RegisteredPet[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  // Pet cujo histórico de alterações está aberto.
+  const [auditPet, setAuditPet] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -276,6 +279,15 @@ export default function ProfessionalRegisteredPetsScreen() {
                       </p>
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={() => setAuditPet({ id: pet.id, name: pet.name })}
+                      className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-[16px] border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                    >
+                      <History className="h-4 w-4" />
+                      Histórico de alterações
+                    </button>
+
                     {pet.vetPass ? (
                       <p className="mt-3 text-xs text-muted-foreground">
                         Vet-Pass <strong className="font-mono text-foreground">{pet.vetPass.code}</strong>
@@ -299,6 +311,10 @@ export default function ProfessionalRegisteredPetsScreen() {
           </>
         )}
       </div>
+
+      {auditPet ? (
+        <PetAuditTrail petId={auditPet.id} petName={auditPet.name} onClose={() => setAuditPet(null)} />
+      ) : null}
     </ProfessionalShell>
   );
 }

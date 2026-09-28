@@ -178,7 +178,7 @@ function petSummaryEmailTemplate(options: {
   petLines: Array<[string, string]>;
   isNewAccount: boolean;
   email: string;
-  vetPassCode: string;
+  vetPassCode: string | null;
   vetPassExpiresAt: Date;
 }) {
   const rows = options.petLines
@@ -220,25 +220,37 @@ function petSummaryEmailTemplate(options: {
       ${accessBlock}
       <div style="margin: 20px 0 0; border: 1px solid #d8e6df; background: #f2f8f5; border-radius: 12px; padding: 16px;">
         <p style="margin: 0 0 8px; font-size: 14px;"><strong>
-          ${options.professional.kind === 'clinic' ? 'Compartilhamento com a clínica' : 'Compartilhamento com o veterinário'}
+          ${options.professional.kind === 'clinic' ? 'Acesso da clínica' : 'Compartilhamento com o veterinário'}
         </strong></p>
-        <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
-          Os dados de ${escapeHtml(options.petLines[0]?.[1] ?? 'seu pet')} estão sendo compartilhados com
-          <strong>${escapeHtml(options.professional.displayName)}</strong> por meio de um Vet-Pass, para
-          acompanhar prontuário, vacinas e exames.
-        </p>
-        <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
-          Código do Vet-Pass: <strong style="font-family: monospace;">${escapeHtml(options.vetPassCode)}</strong><br />
-          Válido até ${options.vetPassExpiresAt.toLocaleDateString('pt-BR')}.
-        </p>
-        <p style="margin: 0; font-size: 14px; color: #5f6a64;">
-          No app, em <strong>Compartilhamentos</strong>, você acompanha esse Vet-Pass a qualquer momento e pode
-          <strong>encerrá-lo quando quiser</strong>.
-        </p>
+        ${
+          options.vetPassCode
+            ? `<p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
+                 Os dados de ${escapeHtml(options.petLines[0]?.[1] ?? 'seu pet')} estão sendo compartilhados com
+                 <strong>${escapeHtml(options.professional.displayName)}</strong> por meio de um Vet-Pass, para
+                 acompanhar prontuário, vacinas e exames.
+               </p>
+               <p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
+                 Código do Vet-Pass: <strong style="font-family: monospace;">${escapeHtml(options.vetPassCode)}</strong><br />
+                 Válido até ${options.vetPassExpiresAt.toLocaleDateString('pt-BR')}.
+               </p>
+               <p style="margin: 0; font-size: 14px; color: #5f6a64;">
+                 No app, em <strong>Compartilhamentos</strong>, você acompanha esse Vet-Pass a qualquer momento e pode
+                 <strong>encerrá-lo quando quiser</strong>.
+               </p>`
+            : `<p style="margin: 0 0 10px; font-size: 14px; color: #5f6a64;">
+                 ${escapeHtml(options.professional.displayName)} cadastrou
+                 ${escapeHtml(options.petLines[0]?.[1] ?? 'seu pet')} no PetHelp e acompanha o prontuário, as vacinas
+                 e os exames desse atendimento — como acontece na ficha de papel da clínica.
+               </p>
+               <p style="margin: 0; font-size: 14px; color: #5f6a64;">
+                 Se levar seu pet a <strong>outra</strong> clínica ou veterinário, é você quem decide o que
+                 compartilhar: no app, em <strong>Compartilhamentos</strong>, você libera o histórico por um
+                 Vet-Pass e encerra quando quiser.
+               </p>`
+        }
       </div>
       <p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">
-        Se algum dado estiver errado, você mesmo pode corrigir no app. Não reconhece quem fez este cadastro?
-        Encerre o Vet-Pass em Compartilhamentos.
+        Você pode completar os dados do pet no app e adicionar exames e vacinas feitos em outros lugares.
       </p>
     </div>
   </div>`;
@@ -469,19 +481,24 @@ router.post('/', async (req: AuthRequest, res, next) => {
       ]
     );
 
-    // Vet-Pass já em uso pelo profissional: é o que dá acesso ao veterinário autônomo,
-    // e o responsável enxerga isso em "Compartilhamentos" e encerra quando quiser.
-    const vetPassCode = `VET-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
+    // O veterinário autônomo acompanha o pet por Vet-Pass, que o responsável encerra
+    // quando quiser. A clínica não usa passe: quem cadastrou o pet acessa pelo próprio
+    // cadastro, porque o histórico ali é atendimento dela.
+    const vetPassCode =
+      professional.kind === 'veterinarian' ? `VET-${randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}` : null;
     const vetPassExpiresAt = new Date(Date.now() + VET_PASS_DAYS * 24 * 60 * 60 * 1000);
-    await connection.execute(
-      `
-        INSERT INTO vet_passes (
-          id, pass_code, tutor_id, pet_id, pet_name, documents, redeemed_by_user_id,
-          expires_at, redeemed_at, includes_medical_records, includes_vaccines, includes_exams
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE, TRUE, TRUE)
-      `,
-      [randomUUID(), vetPassCode, tutorProfileId, petId, petName, '[]', professional.userId, vetPassExpiresAt]
-    );
+
+    if (vetPassCode) {
+      await connection.execute(
+        `
+          INSERT INTO vet_passes (
+            id, pass_code, tutor_id, pet_id, pet_name, documents, redeemed_by_user_id,
+            expires_at, redeemed_at, includes_medical_records, includes_vaccines, includes_exams
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, TRUE, TRUE, TRUE)
+        `,
+        [randomUUID(), vetPassCode, tutorProfileId, petId, petName, '[]', professional.userId, vetPassExpiresAt]
+      );
+    }
 
     await connection.execute(
       `
@@ -573,10 +590,13 @@ router.post('/', async (req: AuthRequest, res, next) => {
           email: tutorEmail,
           isNewAccount,
         },
-        vetPass: {
-          code: vetPassCode,
-          expiresAt: vetPassExpiresAt.toISOString(),
-        },
+        // A clínica acessa pelo próprio cadastro; só o veterinário autônomo recebe passe.
+        vetPass: vetPassCode
+          ? {
+              code: vetPassCode,
+              expiresAt: vetPassExpiresAt.toISOString(),
+            }
+          : null,
         summaryEmailSent: summarySent,
         inviteEmailSent: inviteSent,
         emailConfigured: isEmailConfigured(),

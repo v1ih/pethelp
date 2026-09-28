@@ -5,6 +5,8 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { canAccessPetHealthData } from '../pets/pet-access.js';
+import { blockTutorEditingProfessionalEntry } from '../pets/record-ownership.js';
+import { diffFields, recordAudit } from '../audit/audit.service.js';
 
 type MedicalRecordRow = RowDataPacket & {
   id: string;
@@ -266,6 +268,16 @@ router.post('/pet/:petId', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    await recordAudit({
+      user: req.user,
+      entityType: 'medical_record',
+      entityId: created.id,
+      petId: created.pet_id,
+      action: 'create',
+      summary: `Registro incluído no prontuário de ${created.pet_name ?? 'pet'}`,
+      changes: [{ field: 'description', label: 'Descrição', from: null, to: created.description }],
+    });
+
     res.status(201).json({ data: normalizeMedicalRecord(created) });
   } catch (error) {
     await connection.rollback();
@@ -288,6 +300,12 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
     const access = await canAccessPetHealthData(req.user, existing.pet_id, 'medical_records');
     if (!access.allowed) {
       res.status(access.status ?? 403).json({ message: access.message });
+      return;
+    }
+
+    const blocked = blockTutorEditingProfessionalEntry(req.user, existing.added_by, 'este registro');
+    if (blocked) {
+      res.status(403).json({ message: blocked });
       return;
     }
 
@@ -362,6 +380,44 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    // Guarda o que mudou: é isso que responde "quem alterou o exame e o que alterou".
+    const changes = diffFields(
+      {
+        recordDate: formatDate(existing.record_date),
+        description: existing.description,
+        treatment: existing.treatment,
+        clinicName: existing.clinic_name,
+        veterinarianName: existing.veterinarian_name,
+        documents: existing.documents,
+      },
+      {
+        recordDate: formatDate(updated.record_date),
+        description: updated.description,
+        treatment: updated.treatment,
+        clinicName: updated.clinic_name,
+        veterinarianName: updated.veterinarian_name,
+        documents: updated.documents,
+      },
+      {
+        recordDate: 'Data',
+        description: 'Descrição',
+        treatment: 'Tratamento',
+        clinicName: 'Clínica',
+        veterinarianName: 'Veterinário',
+        documents: 'Anexos',
+      }
+    );
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'medical_record',
+      entityId: updated.id,
+      petId: updated.pet_id,
+      action: 'update',
+      summary: `Registro do prontuário de ${updated.pet_name ?? 'pet'} alterado`,
+      changes,
+    });
+
     res.json({ data: normalizeMedicalRecord(updated) });
   } catch (error) {
     await connection.rollback();
@@ -387,6 +443,12 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    const blocked = blockTutorEditingProfessionalEntry(req.user, existing.added_by);
+    if (blocked) {
+      res.status(403).json({ message: blocked });
+      return;
+    }
+
     // Soft-delete: o RNF09 do TCC proíbe exclusão física de registros de saúde.
     const [result] = await connection.execute<ResultSetHeader>(
       'UPDATE medical_records SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL',
@@ -397,6 +459,16 @@ router.delete('/:id', async (req: AuthRequest, res, next) => {
       res.status(404).json({ message: 'Medical record not found' });
       return;
     }
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'medical_record',
+      entityId: existing.id,
+      petId: existing.pet_id,
+      action: 'delete',
+      summary: `Registro do prontuário de ${existing.pet_name ?? 'pet'} removido`,
+      changes: [{ field: 'description', label: 'Descrição', from: existing.description, to: null }],
+    });
 
     res.status(204).send();
   } catch (error) {

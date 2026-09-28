@@ -19,6 +19,8 @@ export interface Pet {
   linkedClinicId?: string | null;
   /** Nome da clínica vinculada, para mostrar com quem o pet está compartilhado. */
   linkedClinicName?: string | null;
+  /** Vínculo criado pelo cadastro da própria clínica: não é encerrável pelo responsável. */
+  clinicLinkFromRegistration?: boolean;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -53,6 +55,8 @@ export interface MedicalRecord {
   clinicName?: string;
   veterinarianName?: string;
   documents?: string[];
+  /** Quem lançou: informação de clínica ou veterinário o responsável não edita. */
+  addedBy?: 'tutor' | 'veterinarian' | 'clinic';
 }
 
 export interface ExamDocument {
@@ -74,6 +78,8 @@ export interface Vaccine {
   clinicName?: string;
   /** Foto opcional da vacina ou da carteirinha (data URL). */
   photo?: string | null;
+  /** Quem lançou: informação de clínica ou veterinário o responsável não edita. */
+  addedBy?: 'tutor' | 'veterinarian' | 'clinic';
 }
 
 export interface Appointment {
@@ -372,6 +378,7 @@ export function normalizePetFromApi(pet: any): Pet {
     birthDate: pet.birthDate ?? pet.birth_date ?? null,
     linkedClinicId: pet.linkedClinicId ?? null,
     linkedClinicName: pet.linkedClinicName ?? pet.linked_clinic_name ?? null,
+    clinicLinkFromRegistration: pet.clinicLinkFromRegistration === true,
     isActive: Boolean(pet.isActive ?? pet.is_active ?? false),
     createdAt: pet.createdAt ?? pet.created_at,
     updatedAt: pet.updatedAt ?? pet.updated_at,
@@ -390,6 +397,7 @@ export function normalizeMedicalRecordFromApi(record: any): MedicalRecord {
     clinicName: record.clinicName ?? record.clinic_name ?? undefined,
     veterinarianName: record.veterinarianName ?? record.veterinarian_name ?? undefined,
     documents: parseDocumentArray(record.documents),
+    addedBy: record.addedBy ?? record.added_by ?? undefined,
   };
 }
 
@@ -439,6 +447,7 @@ export function normalizeVaccineFromApi(vaccine: any): Vaccine {
     clinicId: vaccine.clinicId ?? vaccine.clinic_id ?? undefined,
     clinicName: vaccine.clinicName ?? vaccine.clinic_name ?? undefined,
     photo: vaccine.photo ?? null,
+    addedBy: vaccine.addedBy ?? vaccine.added_by ?? undefined,
   };
 }
 

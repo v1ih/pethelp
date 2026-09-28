@@ -58,6 +58,7 @@ type PetRow = RowDataPacket & {
   neutered: boolean | null;
   birth_date: Date | string | null;
   linked_clinic_name?: string | null;
+  registered_by_clinic_id?: string | null;
   is_active: number | boolean;
   created_at: Date;
   updated_at: Date;
@@ -81,6 +82,7 @@ const petSelectFields = `
   neutered,
   birth_date,
   is_active,
+  registered_by_clinic_id,
   created_at,
   updated_at,
   (SELECT c.trade_name FROM clinics c WHERE c.id = pets.linked_clinic_id) AS linked_clinic_name
@@ -154,6 +156,10 @@ function normalizePet(row: PetRow) {
     linkedClinicId,
     // Nome da clínica vinculada, para o responsável saber com quem está compartilhando.
     linkedClinicName: linkedClinicId ? row.linked_clinic_name ?? null : null,
+    registeredByClinicId: row.registered_by_clinic_id ?? null,
+    // Vínculo criado pelo cadastro da própria clínica: não é encerrável pelo responsável.
+    clinicLinkFromRegistration:
+      !!linkedClinicId && !!row.registered_by_clinic_id && linkedClinicId === row.registered_by_clinic_id,
     name: row.name,
     species: row.species,
     breed: row.breed,
@@ -316,8 +322,10 @@ petsRouter.get('/', async (req: AuthRequest, res, next) => {
         return;
       }
 
-      conditions.push('linked_clinic_id = ?');
-      values.push(clinicId);
+      // Pets vinculados agora + os que a própria clínica cadastrou (esses são
+      // atendimento dela e continuam na lista mesmo sem vínculo ativo).
+      conditions.push('(linked_clinic_id = ? OR registered_by_clinic_id = ?)');
+      values.push(clinicId, clinicId);
     } else if (req.user?.userType === 'veterinarian') {
       // O veterinário enxerga os pets das clínicas em que está aprovado e também
       // aqueles para os quais tem um Vet-Pass válido — é assim que o autônomo, sem
@@ -845,6 +853,16 @@ petsRouter.delete('/:id/link-clinic', async (req: AuthRequest, res, next) => {
 
     if (!existing.linked_clinic_id) {
       res.status(400).json({ message: 'Este pet não está vinculado a nenhuma clínica.' });
+      return;
+    }
+
+    // A clínica que criou o cadastro não é desvinculável: o histórico é atendimento
+    // dela. O responsável segue controlando o compartilhamento com as outras.
+    if (existing.registered_by_clinic_id && existing.registered_by_clinic_id === existing.linked_clinic_id) {
+      res.status(400).json({
+        message:
+          'Esta clínica cadastrou o pet no PetHelp e mantém acesso ao histórico que ela mesma registrou. Você continua podendo encerrar o compartilhamento com outras clínicas e veterinários.',
+      });
       return;
     }
 

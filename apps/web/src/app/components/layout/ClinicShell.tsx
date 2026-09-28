@@ -11,6 +11,7 @@ import {
   PawPrint,
   Settings,
   Stethoscope,
+  Tags,
   Users,
 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
@@ -20,7 +21,7 @@ import { useOnboarding } from '../../context/OnboardingContext';
 import { useSession } from '../../context/SessionContext';
 import { useAppNavigation } from '../../navigation';
 
-type ClinicNavKey = 'dashboard' | 'registration' | 'registered' | 'veterinarians' | 'agenda' | 'payments' | 'history' | 'settings' | 'notifications';
+type ClinicNavKey = 'dashboard' | 'registration' | 'registered' | 'veterinarians' | 'agenda' | 'payments' | 'prices' | 'history' | 'settings' | 'notifications';
 
 type ClinicShellProps = React.PropsWithChildren<{
   active: ClinicNavKey;
@@ -80,6 +81,7 @@ export function ClinicShell({ active, title, description, actions, children }: C
     { key: 'veterinarians', label: 'Veterinários', icon: Stethoscope, path: '/clinic-veterinarians' },
     { key: 'agenda', label: 'Agenda', icon: CalendarDays, path: '/clinic-agenda' },
     { key: 'payments', label: 'Pagamentos', icon: CircleDollarSign, path: '/clinic-payments' },
+    { key: 'prices', label: 'Preços', icon: Tags, path: '/clinic-prices' },
     { key: 'history', label: 'Histórico', icon: ClipboardList, path: '/clinic-history' },
     { key: 'settings', label: 'Config.', icon: Settings, path: '/clinic-settings' },
   ];

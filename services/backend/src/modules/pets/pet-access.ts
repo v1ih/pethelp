@@ -3,9 +3,27 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { findClinicByUserId, findTutorByUserId, findVeterinarianByUserId } from '../users/users.service.js';
 
+type PetAccessRow = {
+  id: string;
+  current_tutor_id: string | null;
+  linked_clinic_id: string | null;
+  registered_by_clinic_id: string | null;
+};
+
 type AccessResult =
-  | { allowed: true; pet: { id: string; current_tutor_id: string | null; linked_clinic_id: string | null } }
+  | { allowed: true; pet: PetAccessRow }
   | { allowed: false; status: 403 | 404; message: 'Forbidden' | 'Pet not found' };
+
+/**
+ * A clínica enxerga o pet quando ele está vinculado a ela OU quando foi ela que fez o
+ * cadastro. O cadastro é atendimento dela: o histórico que ela produziu continua
+ * acessível mesmo que o responsável desvincule depois — o que o responsável controla é
+ * o compartilhamento com as OUTRAS clínicas e veterinários.
+ */
+export function clinicOwnsPet(clinicId: string | null | undefined, pet: PetAccessRow) {
+  if (!clinicId) return false;
+  return pet.linked_clinic_id === clinicId || pet.registered_by_clinic_id === clinicId;
+}
 
 /** True when the tutor is a shared guardian (guarda compartilhada) of the pet. */
 export async function isTutorGuardianOfPet(petId: string, tutorId: string): Promise<boolean> {
@@ -27,10 +45,11 @@ export type HealthCategory = 'medical_records' | 'vaccines' | 'exams';
  */
 export async function canAccessPetHealthData(user: AuthRequest['user'], petId: string, category?: HealthCategory): Promise<AccessResult> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT id, current_tutor_id, linked_clinic_id FROM pets WHERE id = ? AND is_active = TRUE LIMIT 1',
+    `SELECT id, current_tutor_id, linked_clinic_id, registered_by_clinic_id
+     FROM pets WHERE id = ? AND is_active = TRUE LIMIT 1`,
     [petId]
   );
-  const pet = rows[0] as { id: string; current_tutor_id: string | null; linked_clinic_id: string | null } | undefined;
+  const pet = rows[0] as PetAccessRow | undefined;
   if (!pet) return { allowed: false, status: 404, message: 'Pet not found' };
 
   if (user?.userType === 'tutor') {
@@ -43,7 +62,7 @@ export async function canAccessPetHealthData(user: AuthRequest['user'], petId: s
 
   if (user?.userType === 'clinic') {
     const clinic = await findClinicByUserId(user.id);
-    return clinic?.id === pet.linked_clinic_id ? { allowed: true, pet } : { allowed: false, status: 403, message: 'Forbidden' };
+    return clinicOwnsPet(clinic?.id, pet) ? { allowed: true, pet } : { allowed: false, status: 403, message: 'Forbidden' };
   }
 
   if (user?.userType === 'veterinarian') {

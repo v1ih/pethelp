@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
-import { CalendarDays, CheckCircle2, Clock3, LayoutList, Save, Stethoscope } from 'lucide-react';
+import { CalendarDays, CalendarPlus, CheckCircle2, Clock3, LayoutList, Save, Stethoscope } from 'lucide-react';
 import { ClinicShell } from '../components/layout/ClinicShell';
+import ClinicScheduleDialog from '../components/appointments/ClinicScheduleDialog';
 import { useSession } from '../context/SessionContext';
 import { useInteraction } from '../context/InteractionContext';
 import { getApiBase, getAuthHeaders } from '../context/shared';
@@ -80,6 +81,7 @@ export default function ClinicAgendaScreen() {
   const [selectedVetId, setSelectedVetId] = useState('');
   const [hours, setHours] = useState<WorkingHours>(defaultHours());
   const [saving, setSaving] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const API_BASE = getApiBase();
 
   const dayAppointments = useMemo(
@@ -165,14 +167,24 @@ export default function ClinicAgendaScreen() {
       title="Agenda da clínica"
       description="Defina o horário de atendimento de cada veterinário. Esses horários controlam os agendamentos disponíveis."
       actions={
-        <button
-          type="button"
-          onClick={() => navigate('/clinic-veterinarians')}
-          className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"
-        >
-          <Stethoscope className="h-5 w-5" />
-          Ver veterinários
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => setScheduling(true)}
+            className="inline-flex min-h-12 items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90"
+          >
+            <CalendarPlus className="h-5 w-5" />
+            Agendar consulta
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/clinic-veterinarians')}
+            className="inline-flex min-h-12 items-center gap-2 rounded-[18px] border border-border bg-background px-5 py-3 text-foreground transition-colors hover:bg-muted"
+          >
+            <Stethoscope className="h-5 w-5" />
+            Ver veterinários
+          </button>
+        </>
       }
     >
       <div className="space-y-6">
@@ -335,6 +347,17 @@ export default function ClinicAgendaScreen() {
         </section>
         )}
       </div>
+
+      {scheduling ? (
+        <ClinicScheduleDialog
+          vets={approvedLinks.map((link) => ({
+            veterinarianId: link.veterinarianId,
+            veterinarianName: link.veterinarianName,
+          }))}
+          defaultDate={selectedDay || undefined}
+          onClose={() => setScheduling(false)}
+        />
+      ) : null}
     </ClinicShell>
   );
 }

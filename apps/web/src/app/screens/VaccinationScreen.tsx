@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle, Camera, Download, Eye, FileDown } from 'lucide-react';
+import { ArrowLeft, Plus, Syringe, Calendar, Trash2, Pencil, X, CheckCircle, AlertCircle, Camera, Download, Eye, FileDown, History, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useHealth } from '../context/HealthContext';
 import { usePets } from '../context/PetsContext';
@@ -15,6 +15,20 @@ export default function VaccinationScreen() {
   const navigate = useNavigate();
   const { currentPet } = usePets();
   const { user } = useSession();
+  const isTutor = user?.userType === 'owner';
+
+  /**
+   * Registro feito por clínica ou veterinário não é editável pelo responsável: ele
+   * acrescenta o que é dele, mas não mexe no que o profissional lançou.
+   */
+  const lockedForTutor = (addedBy?: string) => isTutor && (addedBy ?? 'veterinarian') !== 'tutor';
+
+  /** Data do banco ('YYYY-MM-DD') no formato que a pessoa lê. */
+  const formatDay = (value?: string | null) => {
+    if (!value) return '—';
+    const date = new Date(value.length <= 10 ? `${value}T00:00:00` : value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
+  };
   const { vaccines, addVaccine, updateVaccine, deleteVaccine } = useHealth();
   const { goToPetContext } = useAppNavigation();
   const [showForm, setShowForm] = useState(false);
@@ -274,8 +288,8 @@ export default function VaccinationScreen() {
                         <h3 className="text-lg text-foreground">{vaccine.name}</h3>
                         <span className={`rounded-full px-3 py-1 text-xs ${vaccine.status === 'late' ? 'bg-red-100 text-red-700' : 'bg-primary/10 text-primary'}`}>{vaccine.status === 'late' ? 'Atrasada' : 'Em dia'}</span>
                       </div>
-                      <p className="text-sm text-muted-foreground">Aplicada em {vaccine.date}</p>
-                      <p className="text-sm text-muted-foreground">{vaccine.nextDose ? `Próxima dose: ${vaccine.nextDose}` : 'Próxima dose não informada'}</p>
+                      <p className="text-sm text-muted-foreground">Aplicada em {formatDay(vaccine.date)}</p>
+                      <p className="text-sm text-muted-foreground">{vaccine.nextDose ? `Próxima dose: ${formatDay(vaccine.nextDose)}` : 'Próxima dose não informada'}</p>
                       <p className="text-sm text-muted-foreground">{vaccine.veterinarian || 'Veterinário não informado'}</p>
                     </div>
                   </div>
@@ -290,8 +304,19 @@ export default function VaccinationScreen() {
                         Ver foto
                       </button>
                     ) : null}
-                    <button onClick={() => startEdit(vaccine)} className="rounded-full border border-border bg-background p-3 text-muted-foreground transition-colors hover:bg-muted" title="Editar Vacina"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => { if (confirm(`Remover o registro da vacina ${vaccine.name}?`)) void deleteVaccine(vaccine.id); }} className="rounded-full border border-border bg-background p-3 text-red-600 transition-colors hover:bg-red-50" title="Excluir Vacina"><Trash2 className="h-4 w-4" /></button>
+                    {/* Vacina lançada por clínica ou veterinário é registro profissional:
+                        o responsável vê, mas não altera nem apaga. */}
+                    {lockedForTutor(vaccine.addedBy) ? (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
+                        <Lock className="h-3.5 w-3.5" />
+                        {vaccine.addedBy === 'clinic' ? 'Registro da clínica' : 'Registro do veterinário'}
+                      </span>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(vaccine)} className="rounded-full border border-border bg-background p-3 text-muted-foreground transition-colors hover:bg-muted" title="Editar Vacina"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={() => { if (confirm(`Remover o registro da vacina ${vaccine.name}?`)) void deleteVaccine(vaccine.id); }} className="rounded-full border border-border bg-background p-3 text-red-600 transition-colors hover:bg-red-50" title="Excluir Vacina"><Trash2 className="h-4 w-4" /></button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -9,15 +9,24 @@ export type PaymentPdfItem = {
   amountCents: number;
   amountLabel: string;
   status: 'pending' | 'paid' | 'cancelled';
+  categoryLabel?: string | null;
   method: string | null;
   methodLabel: string | null;
   petName: string | null;
   tutorName: string | null;
   professionalName: string | null;
+  serviceDate?: string | null;
   dueDate: string | null;
   paidAt: string | null;
   notes: string | null;
   createdAt: string;
+};
+
+/** Uma linha do resumo por tipo de serviço ou por forma de pagamento. */
+export type PaymentPdfGroup = {
+  label: string;
+  count: number;
+  totalCents: number;
 };
 
 type Rgb = [number, number, number];
@@ -229,11 +238,15 @@ export async function buildPaymentsStatementPdf(options: {
   periodLabel: string;
   ownerLabel: string;
   forTutor?: boolean;
+  /** Somas por tipo de serviço e por forma de pagamento — o fechamento do caixa. */
+  byCategory?: PaymentPdfGroup[];
+  byMethod?: PaymentPdfGroup[];
+  title?: string;
 }) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const logo = await loadLogo();
 
-  drawHeader(doc, 'Extrato de pagamentos', `${options.ownerLabel} · ${options.periodLabel}`, logo);
+  drawHeader(doc, options.title ?? 'Extrato de pagamentos', `${options.ownerLabel} · ${options.periodLabel}`, logo);
 
   const paid = options.payments.filter((item) => item.status === 'paid');
   const pending = options.payments.filter((item) => item.status === 'pending');
@@ -267,6 +280,52 @@ export async function buildPaymentsStatementPdf(options: {
 
   y += 30;
 
+  // Resumo por tipo de serviço e por forma de pagamento: é a conta que a secretária
+  // faz na mão no fim do dia (tanto de consulta, tanto de vacina, tanto no Pix...).
+  const drawGroupTable = (title: string, groups: PaymentPdfGroup[]) => {
+    if (!groups.length) return;
+
+    if (y > FOOTER_TOP - 30) {
+      doc.addPage();
+      y = PAGE.margin + 6;
+    }
+
+    setText(doc, COLORS.ink);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(title, PAGE.margin, y);
+    y += 5;
+
+    setFill(doc, COLORS.surface);
+    setStroke(doc, COLORS.border);
+    doc.setLineWidth(0.3);
+    const boxHeight = groups.length * 6 + 6;
+    doc.roundedRect(PAGE.margin, y, CONTENT_WIDTH, boxHeight, 3, 3, 'FD');
+
+    let rowY = y + 6;
+    for (const group of groups) {
+      setText(doc, COLORS.ink);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(fitText(doc, group.label, 70), PAGE.margin + 5, rowY);
+
+      setText(doc, COLORS.muted);
+      doc.setFontSize(8.5);
+      doc.text(`${group.count}x`, PAGE.margin + 82, rowY);
+
+      setText(doc, COLORS.ink);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text(formatMoney(group.totalCents), PAGE.width - PAGE.margin - 5, rowY, { align: 'right' });
+      rowY += 6;
+    }
+
+    y += boxHeight + 8;
+  };
+
+  drawGroupTable('Por tipo de serviço', options.byCategory ?? []);
+  drawGroupTable(options.forTutor ? 'Por forma de pagamento' : 'Recebido por forma de pagamento', options.byMethod ?? []);
+
   // Cabeçalho da tabela.
   const drawTableHeader = () => {
     setFill(doc, COLORS.primary);
@@ -276,8 +335,9 @@ export async function buildPaymentsStatementPdf(options: {
     doc.setFontSize(8);
     doc.text('DATA', PAGE.margin + 4, y + 5.5);
     doc.text(options.forTutor ? 'PROFISSIONAL' : 'RESPONSÁVEL', PAGE.margin + 24, y + 5.5);
-    doc.text('SERVIÇO', PAGE.margin + 74, y + 5.5);
-    doc.text('SITUAÇÃO', PAGE.margin + 126, y + 5.5);
+    doc.text('SERVIÇO', PAGE.margin + 68, y + 5.5);
+    doc.text('TIPO', PAGE.margin + 112, y + 5.5);
+    doc.text('SITUAÇÃO', PAGE.margin + 136, y + 5.5);
     doc.text('VALOR', PAGE.width - PAGE.margin - 4, y + 5.5, { align: 'right' });
     y += 12;
   };
@@ -301,16 +361,22 @@ export async function buildPaymentsStatementPdf(options: {
     setText(doc, COLORS.ink);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text(formatDay(payment.createdAt) ?? '—', PAGE.margin + 4, y);
+    // A data que vale no fechamento é a do atendimento.
+    doc.text(formatDay(payment.serviceDate ?? payment.createdAt) ?? '—', PAGE.margin + 4, y);
 
     const who = options.forTutor ? payment.professionalName : payment.tutorName;
-    doc.text(fitText(doc, who ?? '—', 46), PAGE.margin + 24, y);
+    doc.text(fitText(doc, who ?? '—', 42), PAGE.margin + 24, y);
 
     const service = [payment.description, payment.petName ? `(${payment.petName})` : null].filter(Boolean).join(' ');
-    doc.text(fitText(doc, service, 48), PAGE.margin + 74, y);
+    doc.text(fitText(doc, service, 42), PAGE.margin + 68, y);
+
+    setText(doc, COLORS.muted);
+    doc.setFontSize(8);
+    doc.text(fitText(doc, payment.categoryLabel ?? '—', 22), PAGE.margin + 112, y);
+    doc.setFontSize(8.5);
 
     setText(doc, payment.status === 'paid' ? COLORS.primaryDark : payment.status === 'pending' ? COLORS.late : COLORS.muted);
-    doc.text(STATUS_LABEL[payment.status], PAGE.margin + 126, y);
+    doc.text(STATUS_LABEL[payment.status], PAGE.margin + 136, y);
 
     setText(doc, COLORS.ink);
     doc.setFont('helvetica', 'bold');

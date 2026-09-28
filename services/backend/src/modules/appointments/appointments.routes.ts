@@ -5,7 +5,8 @@ import { pool } from '../../db/index.js';
 import type { AuthRequest } from '../../middlewares/auth.js';
 import { requireAuth } from '../../middlewares/auth.js';
 import { findClinicByUserId, findTutorByUserId, findVeterinarianByUserId } from '../users/users.service.js';
-import { isTutorGuardianOfPet } from '../pets/pet-access.js';
+import { clinicOwnsPet, isTutorGuardianOfPet } from '../pets/pet-access.js';
+import { recordAudit } from '../audit/audit.service.js';
 import { sendEmail } from '../mail/mailer.js';
 import { asTrimmedString, formatDate, getWeekdayKey, isWithinRange, timeToMinutes } from './appointments.utils.js';
 
@@ -56,12 +57,18 @@ const router = Router();
 
 async function loadPetById(db: DbClient, petId: string) {
   const [rows] = await db.query<RowDataPacket[]>(
-    'SELECT id, current_tutor_id, linked_clinic_id, name FROM pets WHERE id = ? LIMIT 1',
+    'SELECT id, current_tutor_id, linked_clinic_id, registered_by_clinic_id, name FROM pets WHERE id = ? LIMIT 1',
     [petId]
   );
 
   return rows[0] as
-    | { id: string; current_tutor_id: string | null; linked_clinic_id: string | null; name: string }
+    | {
+        id: string;
+        current_tutor_id: string | null;
+        linked_clinic_id: string | null;
+        registered_by_clinic_id: string | null;
+        name: string;
+      }
     | undefined;
 }
 
@@ -320,8 +327,15 @@ async function resolveAvailability(
   const busyTimes = rows.map((row) => row.appointment_time);
   const isBusy = busyTimes.includes(input.time);
 
+  // Um veterinário não atende dois pets no mesmo horário, então aí o choque bloqueia.
+  // A clínica atende vários ao mesmo tempo (plantão, rotação, mais de uma sala): sem
+  // veterinário escolhido, o horário ocupado é só informação na tela.
+  if (isBusy && input.veterinarianId) {
+    issues.push('Este horário já está ocupado para o veterinário selecionado.');
+  }
+
   return {
-    isAvailable: issues.length === 0 && !isBusy,
+    isAvailable: issues.length === 0,
     busyTimes,
     workingHours,
     issues,
@@ -342,7 +356,8 @@ async function canAccessPet(user: AuthRequest['user'], petId: string) {
 
   if (user?.userType === 'clinic') {
     const clinicId = await resolveCurrentClinicId(user);
-    if (!clinicId || pet.linked_clinic_id !== clinicId) {
+    // Vale o vínculo atual ou o cadastro feito pela própria clínica.
+    if (!clinicId || !clinicOwnsPet(clinicId, pet)) {
       return { allowed: false, status: 403, message: 'Forbidden' as const };
     }
   }
@@ -526,6 +541,59 @@ function appointmentEmailTemplate(options: {
       ${options.note ? `<p style="margin: 16px 0 0; font-size: 13px; color: #5f6a64;">${escape(options.note)}</p>` : ''}
     </div>
   </div>`;
+}
+
+/**
+ * Avisa o responsável quando quem marcou a consulta foi a clínica ou o veterinário.
+ * Falha no aviso não desfaz o agendamento: o horário já está reservado.
+ */
+async function notifyTutorAboutNewAppointment(appointment: AppointmentRow, actorType: 'clinic' | 'veterinarian') {
+  try {
+    const { tutor, professional } = await loadAppointmentContacts(appointment);
+    if (!tutor) return;
+
+    const quando = `${new Date(`${formatDate(appointment.appointment_date)}T00:00:00`).toLocaleDateString('pt-BR')} às ${String(
+      appointment.appointment_time
+    ).slice(0, 5)}`;
+    const quem = professional?.name ?? (actorType === 'clinic' ? 'A clínica' : 'O veterinário');
+
+    await pool.execute(
+      `INSERT INTO notifications (id, user_id, pet_id, appointment_id, source_key, type, title, message, notification_date)
+       VALUES (?, ?, ?, ?, ?, 'appointment', ?, ?, CURRENT_DATE)`,
+      [
+        randomUUID(),
+        tutor.userId,
+        appointment.pet_id,
+        appointment.id,
+        `appointment-created:${appointment.id}`,
+        'Consulta agendada',
+        `${quem} marcou uma consulta para ${appointment.pet_name} em ${quando}.`,
+      ]
+    );
+
+    if (tutor.email) {
+      const lines: Array<[string, string]> = [
+        ['Pet', String(appointment.pet_name)],
+        ['Data', quando],
+        ['Motivo', String(appointment.reason)],
+      ];
+      if (professional?.name) lines.push(['Atendimento', professional.name]);
+      if (!appointment.veterinarian_id) lines.push(['Veterinário', 'a definir na clínica']);
+
+      await sendEmail(
+        tutor.email,
+        `Consulta agendada — ${appointment.pet_name}`,
+        appointmentEmailTemplate({
+          title: 'Consulta agendada',
+          intro: `${quem} marcou uma consulta para ${appointment.pet_name}.`,
+          lines,
+          note: 'Precisa desmarcar? Você cancela pelo PetHelp, em Agenda.',
+        })
+      );
+    }
+  } catch (error) {
+    console.error('Falha ao avisar o responsável sobre a consulta agendada:', error);
+  }
 }
 
 router.use(requireAuth);
@@ -766,6 +834,21 @@ router.post('/', async (req: AuthRequest, res, next) => {
       return;
     }
 
+    await recordAudit({
+      user: req.user,
+      entityType: 'appointment',
+      entityId: created.id,
+      petId: created.pet_id,
+      action: 'create',
+      summary: `Consulta marcada para ${new Date(`${date}T00:00:00`).toLocaleDateString('pt-BR')} às ${time.slice(0, 5)}`,
+    });
+
+    // Quando quem marcou foi a clínica ou o veterinário (balcão, telefone), o
+    // responsável precisa ser avisado — ele não estava na tela para ver.
+    if (req.user?.userType === 'clinic' || req.user?.userType === 'veterinarian') {
+      await notifyTutorAboutNewAppointment(created, req.user.userType);
+    }
+
     res.status(201).json({ data: normalizeAppointment(created) });
   } catch (error) {
     await connection.rollback();
@@ -939,6 +1022,16 @@ router.post('/:id/cancel', async (req: AuthRequest, res, next) => {
 
     const reason = asTrimmedString(req.body?.reason).slice(0, 300);
     await pool.execute('UPDATE appointments SET status = ? WHERE id = ?', ['cancelled', existing.id]);
+
+    await recordAudit({
+      user: req.user,
+      entityType: 'appointment',
+      entityId: existing.id,
+      petId: existing.pet_id,
+      action: 'update',
+      summary: `Consulta cancelada${reason ? `: ${reason}` : ''}`,
+      changes: [{ field: 'status', label: 'Situação', from: existing.status, to: 'cancelled' }],
+    });
 
     const { tutor, professional } = await loadAppointmentContacts(existing);
     const cancelledByTutor = req.user?.userType === 'tutor';

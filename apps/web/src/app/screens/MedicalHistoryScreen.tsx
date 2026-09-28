@@ -1,9 +1,10 @@
 ﻿import React, { useState } from 'react';
-import { ArrowLeft, Calendar, Download, Eye, FileText, Paperclip, Pencil, Plus, ShieldAlert, Star, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Calendar, Download, Eye, FileText, History, Lock, Paperclip, Pencil, Plus, ShieldAlert, Star, Trash2, Upload, X } from 'lucide-react';
 import { decodeExamDocument, encodeExamDocument } from '../context/shared';
 import { useHealth } from '../context/HealthContext';
 import { useReviews } from '../context/ReviewsContext';
 import { useSession } from '../context/SessionContext';
+import PetAuditTrail from '../components/audit/PetAuditTrail';
 import VeterinarianShell from '../components/layout/VeterinarianShell';
 import { usePets } from '../context/PetsContext';
 import { useAppNavigation } from '../navigation';
@@ -60,6 +61,16 @@ export default function MedicalHistoryScreen() {
   const { user } = useSession();
   const { goToPetContext } = useAppNavigation();
   const isVeterinarian = user?.userType === 'veterinarian';
+  const isTutor = user?.userType === 'owner';
+
+  /**
+   * Registro feito por clínica ou veterinário não é editável pelo responsável: ele
+   * acrescenta exames e informações próprias, mas não altera o que o profissional
+   * lançou — é isso que protege a clínica de uma acusação depois.
+   */
+  const lockedForTutor = (addedBy?: string) => isTutor && (addedBy ?? 'veterinarian') !== 'tutor';
+
+  const [auditOpen, setAuditOpen] = useState(false);
   const [vetTab, setVetTab] = useState<'consults' | 'reviews'>('consults');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -295,7 +306,23 @@ export default function MedicalHistoryScreen() {
   };
 
   return (
-    <TutorShell active="records" title="Histórico médico" description={`Prontuário clínico cronológico de ${currentPet.name}`} actions={<button onClick={() => (showForm ? clearForm() : startCreate())} className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90">{showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}<span>{editingId ? 'Editar Registro' : 'Adicionar Registro'}</span></button>}>
+    <TutorShell
+      active="records"
+      title="Histórico médico"
+      description={`Prontuário clínico cronológico de ${currentPet.name}`}
+      actions={
+        <>
+          <button
+            onClick={() => setAuditOpen(true)}
+            className="inline-flex min-h-12 items-center gap-2 rounded-[18px] border border-border bg-background px-5 py-3 text-foreground transition-colors hover:bg-muted"
+          >
+            <History className="h-4 w-4" />
+            <span>Quem alterou</span>
+          </button>
+          <button onClick={() => (showForm ? clearForm() : startCreate())} className="inline-flex items-center gap-2 rounded-[18px] bg-primary px-5 py-3 text-white transition-colors hover:bg-primary/90">{showForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}<span>{editingId ? 'Editar Registro' : 'Adicionar Registro'}</span></button>
+        </>
+      }
+    >
       <div className="space-y-6">
         {feedback && <div className={`rounded-2xl border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{feedback.message}</div>}
 
@@ -409,8 +436,19 @@ export default function MedicalHistoryScreen() {
                       {record.clinicName && <span>{record.clinicName}</span>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => startEdit(record)} className="rounded-full border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-muted" title="Editar Registro"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => { if (confirm('Deseja excluir permanentemente este registro médico?')) void deleteMedicalRecord(record.id); }} className="rounded-full border border-border bg-background p-2 text-red-600 transition-colors hover:bg-red-50" title="Excluir Registro"><Trash2 className="h-4 w-4" /></button>
+                      {/* O que a clínica ou o veterinário lançou é registro profissional:
+                          o responsável lê, mas não altera nem apaga. */}
+                      {lockedForTutor(record.addedBy) ? (
+                        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+                          <Lock className="h-3.5 w-3.5" />
+                          {record.addedBy === 'clinic' ? 'Registro da clínica' : 'Registro do veterinário'}
+                        </span>
+                      ) : (
+                        <>
+                          <button onClick={() => startEdit(record)} className="rounded-full border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-muted" title="Editar Registro"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => { if (confirm('Deseja excluir permanentemente este registro médico?')) void deleteMedicalRecord(record.id); }} className="rounded-full border border-border bg-background p-2 text-red-600 transition-colors hover:bg-red-50" title="Excluir Registro"><Trash2 className="h-4 w-4" /></button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -476,6 +514,10 @@ export default function MedicalHistoryScreen() {
           </div>
         </div>
       )}
+
+      {auditOpen ? (
+        <PetAuditTrail petId={currentPet.id} petName={currentPet.name} onClose={() => setAuditOpen(false)} />
+      ) : null}
     </TutorShell>
   );
 }
